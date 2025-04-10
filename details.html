@@ -21,7 +21,6 @@
     <div id="expiredAlert" class="mb-3"></div>
     <h4 class="mb-3">📅 جدول الجلسات</h4>
     <div id="scheduleList"></div>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
@@ -29,8 +28,13 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+
     const days = ["السبت","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"];
-    const sessionTimes = ["08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00", "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"];
+    const sessionTimes = [
+      "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
+      "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
+    ];
+
     const urlParams = new URLSearchParams(window.location.search);
     const teacherName = urlParams.get("teacher");
 
@@ -46,7 +50,6 @@
       const totalHours = parseInt(teacher.offer);
       const totalSessions = Math.floor(totalHours / 1.5);
       const durationWeeks = teacher.offer === "100" ? 24 : teacher.offer === "50" ? 6 : 3;
-
       const startDate = new Date(teacher.startDate);
       const today = new Date();
       const diffWeeks = Math.floor((today - startDate) / (7 * 24 * 60 * 60 * 1000));
@@ -70,10 +73,11 @@
 
       for (let w = 0; w < durationWeeks; w++) {
         for (let d = 0; d < 7; d++) {
+          const day = days[d];
           for (let t of sessionTimes) {
-            const day = days[d];
             if (teacher.availability[day]?.includes(t)) {
               if (count >= totalSessions) break;
+
               const sessionDate = new Date(startDate);
               sessionDate.setDate(sessionDate.getDate() + (w * 7 + d));
               const dateStr = sessionDate.toISOString().split("T")[0];
