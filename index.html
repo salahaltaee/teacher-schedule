@@ -2,269 +2,107 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>إدارة الأساتذة - استوديو نون</title>
+  <title>جدولة الأساتذة - استوديو نون</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
   <style>
     body { direction: rtl; }
-    .btn-time { padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background-color: #f8f9fa; }
-    .btn-time.selected { background-color: #198754; color: white; }
-    .availability-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
     .studio-a { color: green; font-weight: bold; }
     .studio-b { color: blue; font-weight: bold; }
+    .btn-time.selected { background-color: #198754; color: white; }
+    .btn-time { border: 1px solid #ccc; margin: 2px; padding: 5px 10px; }
   </style>
 </head>
 <body>
-  <div class="container my-4">
-    <h1 class="text-center mb-4">📚 إدارة الأساتذة في استوديو نون</h1>
+<div class="container my-4">
+  <h2 class="text-center mb-4">📅 جدول الأساتذة مع منع التضارب</h2>
+  <button class="btn btn-primary mb-3" onclick="generate()">🔁 إنشاء الجدول</button>
+  <div id="scheduleResult"></div>
+</div>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
+    projectId: "noon-a0b62"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-    <div class="text-center mb-4">
-      🗓️ التاريخ: <span id="todayDate"></span> | ⏰ الساعة: <span id="liveClock"></span>
-    </div>
+  const days = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+  const sessionTimes = [
+    "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
+    "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
+  ];
+  function generateSchedule(teachers) {
+    const studios = ["A", "B"];
+    const schedule = [];
+    const bookedSlots = {}; // لمنع الحجز المكرر
+    const sessionCount = {};
+    teachers.forEach(t => sessionCount[t.name] = 0);
 
-    <script>
-      const firebaseConfig = {
-        apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
-        projectId: "noon-a0b62"
-      };
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.firestore();
+    const getWeeksForOffer = (offer) =>
+      offer === "100" ? 24 : offer === "50" ? 6 : 3;
 
-      const days = ["السبت","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"];
-      const sessionTimes = ["08:00 - 10:00","10:00 - 12:00","12:00 - 14:00","14:00 - 16:00","16:00 - 18:00","18:00 - 20:00","20:00 - 22:00"];
+    for (const teacher of teachers) {
+      const weeks = getWeeksForOffer(teacher.offer);
+      const totalSessions = Math.floor(parseInt(teacher.offer) / 1.5);
+      const startDate = new Date(teacher.startDate);
+      let addedSessions = 0;
+      let studioToggle = 0;
 
-      document.getElementById("todayDate").innerText = new Date().toLocaleDateString("ar-EG");
-      function updateClock() {
-        const now = new Date();
-        const h = now.getHours().toString().padStart(2, '0');
-        const m = now.getMinutes().toString().padStart(2, '0');
-        document.getElementById("liveClock").innerText = `${h}:${m}`;
+      for (let w = 0; w < weeks; w++) {
+        for (let d = 0; d < days.length; d++) {
+          for (let t of sessionTimes) {
+            if (teacher.availability[days[d]]?.includes(t)) {
+              if (addedSessions >= totalSessions) break;
+
+              const sessionDate = new Date(startDate);
+              sessionDate.setDate(sessionDate.getDate() + w * 7 + d);
+              const dateStr = sessionDate.toISOString().split("T")[0];
+              const studio = studios[studioToggle % 2];
+              studioToggle++;
+
+              const key = `${dateStr}_${t}_${studio}`;
+              if (!bookedSlots[key]) {
+                schedule.push({
+                  week: w + 1,
+                  date: dateStr,
+                  day: days[d],
+                  time: t,
+                  studio,
+                  teacher: teacher.name,
+                  phone: teacher.phone
+                });
+                bookedSlots[key] = true;
+                sessionCount[teacher.name]++;
+                addedSessions++;
+              }
+            }
+          }
+        }
       }
-      setInterval(updateClock, 1000);
-      updateClock();
-    </script>
-
-    <!-- ✅ نموذج إضافة / تعديل أستاذ -->
-    <div class="card mb-4">
-      <div class="card-body">
-        <h4 class="card-title mb-3">➕ إضافة / تعديل أستاذ</h4>
-        <div class="row">
-          <div class="col-md-6 mb-3"><label>الاسم</label><input type="text" id="name" class="form-control" /></div>
-          <div class="col-md-6 mb-3"><label>الهاتف</label><input type="text" id="phone" class="form-control" /></div>
-          <div class="col-md-6 mb-3"><label>تاريخ البدء</label><input type="date" id="startDate" class="form-control" /></div>
-          <div class="col-md-6 mb-3">
-            <label>نوع العرض</label>
-            <select id="offer" class="form-select">
-              <option value="100">100 ساعة</option>
-              <option value="50">50 ساعة</option>
-              <option value="15">15 ساعة</option>
-            </select>
-          </div>
-          <div class="col-md-6 mb-3"><label>المدفوع</label><input type="number" id="paid" class="form-control" /></div>
-          <div class="col-md-6 mb-3"><label>الإجمالي</label><input type="number" id="total" class="form-control" /></div>
-        </div>
-        <h6 class="mt-3">🕐 الأوقات المتاحة:</h6>
-        <div id="availability-container" class="mt-2"></div>
-        <button onclick="addTeacher()" class="btn btn-success mt-3">💾 حفظ</button>
-      </div>
-    </div>
-<script>
-  let availability = {};
-  let editingId = null;
-
-  const availabilityContainer = document.getElementById("availability-container");
-  days.forEach(day => {
-    const row = document.createElement("div");
-    row.innerHTML = `<strong>${day}</strong>`;
-    const grid = document.createElement("div");
-    grid.className = "availability-grid";
-    sessionTimes.forEach(time => {
-      const btn = document.createElement("button");
-      btn.className = "btn-time";
-      btn.innerText = time;
-      btn.onclick = () => {
-        if (!availability[day]) availability[day] = [];
-        if (availability[day].includes(time)) {
-          availability[day] = availability[day].filter(t => t !== time);
-          btn.classList.remove("selected");
-        } else {
-          availability[day].push(time);
-          btn.classList.add("selected");
-        }
-      };
-      grid.appendChild(btn);
-    });
-    availabilityContainer.appendChild(row);
-    availabilityContainer.appendChild(grid);
-  });
-
-  async function addTeacher() {
-    const name = document.getElementById("name").value.trim();
-    const phone = document.getElementById("phone").value.trim();
-    const startDate = document.getElementById("startDate").value;
-    const offer = document.getElementById("offer").value;
-    const paid = parseFloat(document.getElementById("paid").value || "0");
-    const total = parseFloat(document.getElementById("total").value || "0");
-    const remainingHours = parseInt(offer);
-
-    const teacherData = {
-      name, phone, startDate, offer,
-      amountPaid: paid, totalAmount: total,
-      remainingHours, availability
-    };
-
-    if (editingId) {
-      await db.collection("teachers").doc(editingId).set(teacherData);
-      editingId = null;
-    } else {
-      await db.collection("teachers").add(teacherData);
     }
 
-    window.location.reload();
+    return schedule;
   }
-
-  function editTeacher(id) {
-    db.collection("teachers").doc(id).get().then(doc => {
-      const t = doc.data();
-      editingId = id;
-      document.getElementById("name").value = t.name;
-      document.getElementById("phone").value = t.phone;
-      document.getElementById("startDate").value = t.startDate;
-      document.getElementById("offer").value = t.offer;
-      document.getElementById("paid").value = t.amountPaid;
-      document.getElementById("total").value = t.totalAmount;
-      availability = t.availability;
-
-      document.querySelectorAll(".btn-time").forEach(btn => {
-        const day = btn.parentElement.previousElementSibling?.textContent;
-        if (availability[day]?.includes(btn.textContent)) {
-          btn.classList.add("selected");
-        } else {
-          btn.classList.remove("selected");
-        }
-      });
-    });
-  }
-
-  function deleteTeacher(id) {
-    if (confirm("هل تريد حذف هذا الأستاذ؟")) {
-      db.collection("teachers").doc(id).delete().then(() => {
-        alert("تم الحذف بنجاح.");
-        window.location.reload();
-      });
-    }
-  }
-</script>
-<!-- 🔸 قائمة الأساتذة -->
-<div class="my-5">
-  <h4 class="mb-3">👨‍🏫 قائمة الأساتذة</h4>
-  <div id="teacherList" class="row"></div>
-</div>
-
-<!-- 🔸 من سيصور اليوم -->
-<div class="my-5">
-  <h4 class="mb-3">📅 من سيصور اليوم</h4>
-  <ul id="todaySchedule" class="list-group mb-4"></ul>
-
-  <div class="row">
-    <div class="col-md-6">
-      <h5 class="studio-a">🎥 استوديو A الآن</h5>
-      <div id="nowA" class="border p-3 rounded">جارِ التحديث...</div>
-    </div>
-    <div class="col-md-6">
-      <h5 class="studio-b">🎥 استوديو B الآن</h5>
-      <div id="nowB" class="border p-3 rounded">جارِ التحديث...</div>
-    </div>
-  </div>
-</div>
-
-<script>
-  async function loadTeachers() {
+  async function generate() {
     const snapshot = await db.collection("teachers").get();
-    const list = document.getElementById("teacherList");
-    list.innerHTML = "";
-
     const teachers = [];
     snapshot.forEach(doc => {
       const t = doc.data();
-      t.id = doc.id;
       teachers.push(t);
-
-      const card = document.createElement("div");
-      card.className = "col-md-6 mb-3";
-      card.innerHTML = `
-        <div class="card">
-          <div class="card-body">
-            <h5 class="card-title">${t.name}</h5>
-            <p>العرض: ${t.offer} ساعة</p>
-            <p>المتبقي: ${t.remainingHours} ساعة</p>
-            <a href="details.html?teacher=${encodeURIComponent(t.name)}" class="btn btn-primary btn-sm">📄 عرض التفاصيل</a>
-            <button class="btn btn-warning btn-sm ms-2" onclick="editTeacher('${t.id}')">✏️ تعديل</button>
-            <button class="btn btn-danger btn-sm ms-2" onclick="deleteTeacher('${t.id}')">🗑️ حذف</button>
-          </div>
-        </div>`;
-      list.appendChild(card);
     });
 
-    generateTodaySchedule(teachers);
+    const result = generateSchedule(teachers);
+    const container = document.getElementById("scheduleResult");
+    container.innerHTML = result.map(s => `
+      <div class="border p-2 mb-2 rounded">
+        الأسبوع ${s.week} - 📅 ${s.date} - 🕐 ${s.time} -
+        🎥 استوديو <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span><br>
+        👨‍🏫 ${s.teacher}
+      </div>
+    `).join("");
   }
-  function generateTodaySchedule(teachers) {
-    const todayList = document.getElementById("todaySchedule");
-    const studioA = document.getElementById("nowA");
-    const studioB = document.getElementById("nowB");
-
-    const now = new Date();
-    const hourNow = now.getHours();
-    const todayDay = days[now.getDay() === 0 ? 6 : now.getDay() - 1];
-
-    let allSessions = [];
-
-    teachers.forEach((t, ti) => {
-      const startDate = new Date(t.startDate);
-      const diffWeeks = Math.floor((now - startDate) / (7 * 24 * 60 * 60 * 1000));
-      const maxWeeks = t.offer === "100" ? 24 : t.offer === "50" ? 6 : 3;
-
-      if (diffWeeks < 0 || diffWeeks >= maxWeeks) return;
-
-      const availableToday = t.availability[todayDay] || [];
-
-      availableToday.forEach((time, index) => {
-        const hour = parseInt(time.split(":")[0]);
-        const studio = (index + ti) % 2 === 0 ? "A" : "B";
-        allSessions.push({
-          name: t.name,
-          time,
-          hour,
-          studio,
-          phone: t.phone
-        });
-      });
-    });
-
-    allSessions.sort((a, b) => a.hour - b.hour);
-
-    todayList.innerHTML = "";
-    allSessions.forEach(s => {
-      const item = document.createElement("li");
-      item.className = "list-group-item d-flex justify-content-between align-items-center";
-      item.innerHTML = `
-        <span>${s.name}</span>
-        <span>${s.time}</span>
-        <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span>
-      `;
-      todayList.appendChild(item);
-    });
-
-    const nowA = allSessions.find(s => s.studio === "A" && hourNow >= s.hour && hourNow < s.hour + 2);
-    const nowB = allSessions.find(s => s.studio === "B" && hourNow >= s.hour && hourNow < s.hour + 2);
-
-    studioA.innerHTML = nowA ? `🎬 الآن: <strong>${nowA.name}</strong><br>🕒 ${nowA.time}` : "لا أحد يصور الآن";
-    studioB.innerHTML = nowB ? `🎬 الآن: <strong>${nowB.name}</strong><br>🕒 ${nowB.time}` : "لا أحد يصور الآن";
-  }
-
-  loadTeachers();
 </script>
-</div>
 </body>
 </html>
