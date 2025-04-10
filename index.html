@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>إدارة الأساتذة - استوديو نون</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
   <style>
@@ -11,6 +11,9 @@
     .btn-time.selected { background-color: #198754; color: white; }
     .btn-time { border: 1px solid #ccc; margin: 2px; padding: 5px 10px; }
     .availability-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+    .studio-a { color: green; font-weight: bold; }
+    .studio-b { color: blue; font-weight: bold; }
+    .card-teacher { border: 1px solid #ccc; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -41,6 +44,36 @@
         <button onclick="addTeacher()" class="btn btn-success mt-3">✅ حفظ الأستاذ</button>
       </div>
     </div>
+    <!-- ✅ قائمة الأساتذة -->
+    <div>
+      <h4 class="mb-3">👨‍🏫 قائمة الأساتذة</h4>
+      <div id="teacherList" class="row"></div>
+    </div>
+
+    <!-- ✅ من سيصور اليوم -->
+    <div class="my-5">
+      <h4>📅 من سيصور اليوم <span id="todayDate"></span> 🕒 <span id="liveClock"></span></h4>
+      <ul id="todayList" class="list-group mb-4"></ul>
+
+      <div class="row">
+        <div class="col-md-6">
+          <h5>🎥 استوديو A</h5>
+          <div id="studioA" class="border p-3 rounded mb-3 bg-light"></div>
+        </div>
+        <div class="col-md-6">
+          <h5>🎥 استوديو B</h5>
+          <div id="studioB" class="border p-3 rounded mb-3 bg-light"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ زر توليد الجدول -->
+    <div class="text-center mb-4">
+      <button class="btn btn-primary" onclick="generate()">🔁 إنشاء الجدول</button>
+    </div>
+
+    <!-- ✅ جدول الجلسات -->
+    <div id="scheduleResult"></div>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
@@ -56,8 +89,7 @@
   ];
 
   let availability = {};
-  const usageMap = {}; // العدّادات
-
+  const usageMap = {};
   const container = document.getElementById("availability-container");
 
   days.forEach(day => {
@@ -77,8 +109,8 @@
       btn.textContent = time;
       btn.onclick = () => {
         if (usageMap[key] >= 2) return;
-
         if (!availability[day]) availability[day] = [];
+
         if (!availability[day].includes(time)) {
           availability[day].push(time);
           usageMap[key]++;
@@ -96,6 +128,7 @@
 
     container.appendChild(row);
   });
+
   async function addTeacher() {
     const name = document.getElementById("name").value;
     const phone = document.getElementById("phone").value;
@@ -105,20 +138,10 @@
     const total = parseFloat(document.getElementById("total").value || 0);
     const remainingHours = parseInt(offer);
 
-    if (!name || !phone || !startDate || !offer) {
-      alert("يرجى ملء جميع الحقول ✋");
-      return;
-    }
-
     await db.collection("teachers").add({
-      name,
-      phone,
-      startDate,
-      offer,
-      amountPaid: paid,
-      totalAmount: total,
-      remainingHours,
-      availability
+      name, phone, startDate, offer,
+      amountPaid: paid, totalAmount: total,
+      remainingHours, availability
     });
 
     alert("✅ تم حفظ الأستاذ");
@@ -144,13 +167,107 @@
   }
 
   async function deleteTeacher(id) {
-    if (confirm("هل أنت متأكد من حذف هذا الأستاذ؟")) {
+    if (confirm("هل أنت متأكد من الحذف؟")) {
       await db.collection("teachers").doc(id).delete();
       loadTeachers();
     }
   }
 
   loadTeachers();
+  async function generate() {
+    const snapshot = await db.collection("teachers").get();
+    const teachers = snapshot.docs.map(doc => doc.data());
+    const studios = ["A", "B"];
+    const results = [];
+    const booked = {};
+
+    teachers.forEach(teacher => {
+      const sessions = Math.floor(parseInt(teacher.offer) / 1.5);
+      const weeks = teacher.offer === "100" ? 24 : teacher.offer === "50" ? 6 : 3;
+      const startDate = new Date(teacher.startDate);
+      let count = 0;
+      let studioToggle = 0;
+
+      for (let w = 0; w < weeks; w++) {
+        for (let d = 0; d < 7; d++) {
+          for (let t of sessionTimes) {
+            if (teacher.availability[days[d]]?.includes(t)) {
+              if (count >= sessions) break;
+              const sessionDate = new Date(startDate);
+              sessionDate.setDate(sessionDate.getDate() + (w * 7 + d));
+              const dateStr = sessionDate.toISOString().split("T")[0];
+              const studio = studios[studioToggle % 2];
+              studioToggle++;
+
+              const key = `${dateStr}_${t}_${studio}`;
+              if (!booked[key]) {
+                booked[key] = true;
+                results.push({
+                  week: w + 1,
+                  date: dateStr,
+                  day: days[sessionDate.getDay()],
+                  time: t,
+                  studio,
+                  teacher: teacher.name,
+                  phone: teacher.phone
+                });
+                count++;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // عرض الجدول
+    document.getElementById("scheduleResult").innerHTML = results.map(s => `
+      <div class="border p-2 mb-2">
+        الأسبوع ${s.week} - 📅 ${s.date} (${s.day}) - ⏰ ${s.time}
+        - 🎥 <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span><br>
+        👨‍🏫 ${s.teacher}
+        <a href="https://wa.me/${s.phone}?text=مرحبا استاذ ${encodeURIComponent(s.teacher)} ننتظرك بتاريخ ${s.date} بساعة ${s.time}" 
+           class="btn btn-sm btn-success ms-2" target="_blank">💬 واتساب</a>
+      </div>
+    `).join("");
+
+    showToday(results);
+  }
+
+  function showToday(results) {
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+    const nowHour = today.getHours();
+    document.getElementById("todayDate").textContent = today.toLocaleDateString("ar-EG");
+
+    const todaySessions = results.filter(s => s.date === todayStr);
+    document.getElementById("todayList").innerHTML = todaySessions.map(s =>
+      `<li class="list-group-item">${s.teacher} - ${s.time} - استوديو ${s.studio}</li>`
+    ).join("");
+
+    const studioA = document.getElementById("studioA");
+    const studioB = document.getElementById("studioB");
+
+    const nowSession = todaySessions.find(s => {
+      const h = parseInt(s.time.split(":")[0]);
+      return nowHour >= h && nowHour < h + 2;
+    });
+
+    const nextSession = todaySessions.find(s => {
+      const h = parseInt(s.time.split(":")[0]);
+      return h > nowHour;
+    });
+
+    studioA.innerHTML = nowSession?.studio === "A" ? `${nowSession.teacher} يصور الآن` :
+                        nextSession?.studio === "A" ? `التالي: ${nextSession.teacher}` : "لا أحد";
+    studioB.innerHTML = nowSession?.studio === "B" ? `${nowSession.teacher} يصور الآن` :
+                        nextSession?.studio === "B" ? `التالي: ${nextSession.teacher}` : "لا أحد";
+  }
+
+  // ⏱️ ساعة حية
+  setInterval(() => {
+    const now = new Date();
+    document.getElementById("liveClock").textContent = now.toLocaleTimeString("ar-EG");
+  }, 1000);
 </script>
 </body>
 </html>
