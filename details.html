@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>تفاصيل الأستاذ</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
   <style>
@@ -12,7 +12,6 @@
     .studio-a { color: green; font-weight: bold; }
     .studio-b { color: blue; font-weight: bold; }
     .alert-warning { color: red; font-weight: bold; }
-    .reduce-buttons .btn { margin: 3px; }
   </style>
 </head>
 <body>
@@ -20,10 +19,8 @@
     <h1 class="mb-4">📋 تفاصيل الأستاذ</h1>
     <div id="teacherInfo" class="mb-4"></div>
     <div id="expiredAlert" class="mb-3"></div>
-    <div id="reduceControls" class="mb-4 reduce-buttons"></div>
     <h4 class="mb-3">📅 جدول الجلسات</h4>
     <div id="scheduleList"></div>
-  </div>
 
   <script>
     const firebaseConfig = {
@@ -32,7 +29,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    const days = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+    const days = ["السبت","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"];
     const sessionTimes = ["08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00", "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"];
     const urlParams = new URLSearchParams(window.location.search);
     const teacherName = urlParams.get("teacher");
@@ -40,17 +37,16 @@
     async function loadTeacher() {
       const snapshot = await db.collection("teachers").where("name", "==", teacherName).get();
       if (snapshot.empty) {
-        document.body.innerHTML = "<div class='container'><div class='alert alert-danger'>❌ الأستاذ غير موجود!</div></div>";
+        document.body.innerHTML = "<div class='alert alert-danger'>❌ الأستاذ غير موجود!</div>";
         return;
       }
 
       const doc = snapshot.docs[0];
       const teacher = doc.data();
-      const teacherId = doc.id;
-
       const totalHours = parseInt(teacher.offer);
       const totalSessions = Math.floor(totalHours / 1.5);
       const durationWeeks = teacher.offer === "100" ? 24 : teacher.offer === "50" ? 6 : 3;
+
       const startDate = new Date(teacher.startDate);
       const today = new Date();
       const diffWeeks = Math.floor((today - startDate) / (7 * 24 * 60 * 60 * 1000));
@@ -66,37 +62,34 @@
       `;
 
       if (isExpired) {
-        document.getElementById("expiredAlert").innerHTML = '<div class="alert alert-warning">⚠️ العرض خلص، جدد العرض</div>';
+        document.getElementById("expiredAlert").innerHTML = `<div class="alert alert-warning">⚠️ العرض خلص، جدد العرض</div>`;
       }
-      const reduceArea = document.getElementById("reduceControls");
-      [0.5, 1, 2, 3].forEach(h => {
-        const btn = document.createElement("button");
-        btn.className = "btn btn-outline-danger";
-        btn.innerText = `➖ ${h} ساعة`;
-        btn.onclick = () => {
-          teacher.remainingHours = Math.max(0, teacher.remainingHours - h);
-          db.collection("teachers").doc(teacherId).set(teacher).then(() => location.reload());
-        };
-        reduceArea.appendChild(btn);
-      });
-
       let schedule = [];
-      let sessionCount = 0;
+      let count = 0;
       let studioToggle = 0;
 
       for (let w = 0; w < durationWeeks; w++) {
         for (let d = 0; d < 7; d++) {
           for (let t of sessionTimes) {
-            if (teacher.availability[days[d]]?.includes(t)) {
-              if (sessionCount >= totalSessions) break;
+            const day = days[d];
+            if (teacher.availability[day]?.includes(t)) {
+              if (count >= totalSessions) break;
               const sessionDate = new Date(startDate);
               sessionDate.setDate(sessionDate.getDate() + (w * 7 + d));
-              const dayName = days[sessionDate.getDay()];
               const dateStr = sessionDate.toISOString().split("T")[0];
+              const realDay = days[sessionDate.getDay()];
               const studio = studioToggle % 2 === 0 ? "A" : "B";
               studioToggle++;
-              schedule.push({ week: w + 1, date: dateStr, day: dayName, time: t, studio });
-              sessionCount++;
+
+              schedule.push({
+                week: w + 1,
+                date: dateStr,
+                day: realDay,
+                time: t,
+                studio
+              });
+
+              count++;
             }
           }
         }
@@ -108,20 +101,14 @@
         return `
           <div class="schedule-card d-flex justify-content-between align-items-center">
             <div>
-              <strong>الأسبوع ${s.week}</strong> - 📅 ${s.date} (${s.day})<br>
+              الأسبوع ${s.week} - ${s.date} (${s.day})<br>
               الوقت: ${s.time} - الاستوديو: <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span>
             </div>
             <div>
-              <a href="${wa}" target="_blank" class="btn btn-success btn-sm mb-1">💬 واتساب</a>
-              <button class="btn btn-danger btn-sm" onclick="decrease()">➖ تسجيل جلسة</button>
+              <a href="${wa}" target="_blank" class="btn btn-success btn-sm">💬 واتساب</a>
             </div>
           </div>`;
       }).join("");
-
-      window.decrease = () => {
-        teacher.remainingHours = Math.max(0, teacher.remainingHours - 1.5);
-        db.collection("teachers").doc(teacherId).set(teacher).then(() => location.reload());
-      };
     }
 
     loadTeacher();
