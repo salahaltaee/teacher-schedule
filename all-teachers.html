@@ -32,7 +32,6 @@
     <div id="teacherList" class="row"></div>
     <a href="index.html" class="btn btn-secondary mt-3">🔙 رجوع للصفحة الرئيسية</a>
   </div>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
@@ -62,11 +61,22 @@
         const remainingSessions = (t.remainingHours / 1.5).toFixed(0);
         const startDate = new Date(t.startDate);
         const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+        const offerWeeks = t.offer === "100" ? 24 : t.offer === "50" ? 6 : 3;
+        const isExpired = t.remainingHours <= 0 || (daysSinceStart / 7) >= offerWeeks;
 
+        let statusBadge = "";
+        if (isExpired) {
+          statusBadge = `<div class="badge bg-danger mb-2">🔴 منتهي</div>`;
+        } else if (remainingSessions <= 3) {
+          statusBadge = `<div class="badge bg-warning text-dark mb-2">🟡 شبه منتهي</div>`;
+        } else {
+          statusBadge = `<div class="badge bg-success mb-2">🟢 نشط</div>`;
+        }
         const card = document.createElement("div");
         card.className = "col-md-6";
         card.innerHTML = `
           <div class="card-teacher">
+            ${statusBadge}
             <strong>${t.name}</strong> - ${t.offer} ساعة<br>
             📞 ${t.phone} | يبدأ: ${t.startDate}<br>
             💰 ${t.amountPaid} / ${t.totalAmount}<br>
@@ -85,7 +95,6 @@
             </div>
           </div>
         `;
-
         list.appendChild(card);
       });
     }
