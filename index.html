@@ -32,6 +32,10 @@
     <div class="text-end mb-3">
       <a href="filter.html" class="btn btn-outline-primary">🔍 صفحة الفلاتر</a>
     </div>
+    
+<div class="text-end mb-4">
+  <a href="all-teachers.html" class="btn btn-outline-dark">📋 عرض جميع الأساتذة</a>
+</div>
 
     <!-- إشعار التعديل -->
     <div id="editNotice" class="alert alert-info d-none"></div>
@@ -345,5 +349,52 @@
   showTodaySchedule();
 </script>
 </div> <!-- نهاية container -->
+  <div class="section-title mt-5">🔔 التنبيهات</div>
+<div id="alerts" class="mb-5"></div>
+
+<script>
+  async function generateAlerts() {
+    const snapshot = await db.collection("teachers").get();
+    const today = new Date();
+    const alertBox = document.getElementById("alerts");
+    let alerts = [];
+
+    snapshot.docs.forEach(doc => {
+      const t = doc.data();
+      const startDate = new Date(t.startDate);
+      const diffDays = (today - startDate) / (1000 * 60 * 60 * 24);
+      const offerWeeks = t.offer === "100" ? 24 : t.offer === "50" ? 6 : 3;
+      const passedWeeks = diffDays / 7;
+
+      // 💰 متأخر في الدفع
+      if (diffDays >= 30 && t.amountPaid < t.totalAmount) {
+        const due = t.totalAmount - t.amountPaid;
+        const msg = `مرحبا استاذ ${t.name} باقي عليك مبلغ ${due} بانتظارك ولك كل التحية والامتنان - إدارة استوديو نون`;
+        alerts.push(`
+          <div class="alert alert-warning">
+            💸 الأستاذ <strong>${t.name}</strong> مر عليه أكثر من شهر ولم يكمل المبلغ.
+            <a href="https://wa.me/${t.phone}?text=${encodeURIComponent(msg)}" target="_blank" class="btn btn-sm btn-success ms-2">💬 أرسل واتساب</a>
+          </div>
+        `);
+      }
+
+      // ⛔ انتهاء العرض أو الساعات
+      if (t.remainingHours <= 0 || passedWeeks >= offerWeeks) {
+        const msg = `مرحبا استاذ ${t.name} شكرا لقضاء رحلة تعليمية معنا بانتظارك تجدد اشتراكك باحدى الباقات اللي عندنا اذا تحب ازودك بتفاصيلها شاكرين تعاونك ومتمنين لك افضل الاوقات واحسن النتائج ووافر التوفيق لك - إدارة استوديو نون`;
+        alerts.push(`
+          <div class="alert alert-danger">
+            ⌛ الأستاذ <strong>${t.name}</strong> انتهى اشتراكه أو استهلك كل ساعاته.
+            <a href="https://wa.me/${t.phone}?text=${encodeURIComponent(msg)}" target="_blank" class="btn btn-sm btn-success ms-2">💬 أرسل واتساب</a>
+          </div>
+        `);
+      }
+    });
+
+    alertBox.innerHTML = alerts.length > 0 ? alerts.join("") : "<div class='text-muted'>لا توجد تنبيهات حالياً ✅</div>";
+  }
+
+  generateAlerts();
+</script>
+
 </body>
 </html>
