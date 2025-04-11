@@ -28,6 +28,7 @@
     <h4 class="mb-3">📅 جدول الجلسات</h4>
     <div id="scheduleList"></div>
   </div>
+
   <script>
     const days = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
     const sessionTimes = ["08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00", "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"];
@@ -63,6 +64,7 @@
     if (isExpired) {
       document.getElementById("expiredAlert").innerHTML = '<div class="alert alert-warning">العرض خلص، جدد العرض</div>';
     }
+
     let schedule = [];
     let sessionCount = 0;
 
