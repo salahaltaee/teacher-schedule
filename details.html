@@ -1,131 +1,112 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>تفاصيل الأستاذ</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
-  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <style>
     body { direction: rtl; }
     .schedule-card { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
-    .studio-a { color: green; font-weight: bold; }
-    .studio-b { color: blue; font-weight: bold; }
     .alert-warning { color: red; font-weight: bold; }
+    .btn-group > .btn { margin-left: 5px; }
   </style>
 </head>
 <body>
   <div class="container my-4">
     <h1 class="mb-4">📋 تفاصيل الأستاذ</h1>
     <div id="teacherInfo" class="mb-4"></div>
-    <div id="expiredAlert" class="mb-3"></div>
-    <div class="mb-3">
-      <a href="index.html" class="btn btn-secondary">🔙 رجوع إلى الصفحة الرئيسية</a>
+    <div class="mb-3 d-flex gap-2 flex-wrap">
+      <button onclick="decrease(0.5)" class="btn btn-outline-danger btn-sm">➖ نصف ساعة</button>
+      <button onclick="decrease(1)" class="btn btn-outline-danger btn-sm">➖ ساعة</button>
+      <button onclick="decrease(1.5)" class="btn btn-outline-danger btn-sm">➖ ساعة ونصف</button>
+      <button onclick="decrease(2)" class="btn btn-outline-danger btn-sm">➖ ساعتين</button>
+      <button onclick="decrease(3)" class="btn btn-outline-danger btn-sm">➖ ثلاث ساعات</button>
+      <button onclick="decrease(5)" class="btn btn-outline-danger btn-sm">➖ خمس ساعات</button>
+      <button onclick="window.print()" class="btn btn-success btn-sm">🖨️ طباعة التفاصيل</button>
     </div>
+    <div id="expiredAlert" class="mb-3"></div>
     <h4 class="mb-3">📅 جدول الجلسات</h4>
     <div id="scheduleList"></div>
   </div>
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
-      projectId: "noon-a0b62"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    const sessionTimes = [
-      "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
-      "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
-    ];
-
-    function getDayName(dateStr) {
-      const date = new Date(dateStr + "T00:00:00");
-      const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-      return days[date.getDay()];
-    }
-
+    const days = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+    const sessionTimes = ["08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00", "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"];
     const urlParams = new URLSearchParams(window.location.search);
     const teacherName = urlParams.get("teacher");
+    const teachers = JSON.parse(localStorage.getItem("teachers") || "[]");
+    const teacherIndex = teachers.findIndex(t => t.name === teacherName);
+    const teacher = teachers[teacherIndex];
 
-    async function loadTeacher() {
-      const snapshot = await db.collection("teachers").where("name", "==", teacherName).get();
-      if (snapshot.empty) {
-        document.body.innerHTML = "<div class='alert alert-danger'>❌ الأستاذ غير موجود!</div>";
-        return;
-      }
-
-      const teacher = snapshot.docs[0].data();
-      const totalHours = parseInt(teacher.offer);
-      const totalSessions = Math.floor(totalHours / 1.5);
-      const durationWeeks = teacher.offer === "100" ? 24 : teacher.offer === "50" ? 6 : 3;
-
-      const startDate = new Date(teacher.startDate);
-      const today = new Date();
-      const diffWeeks = Math.floor((today - startDate) / (7 * 24 * 60 * 60 * 1000));
-      const isExpired = teacher.remainingHours <= 0 || diffWeeks >= durationWeeks;
-
-      document.getElementById("teacherInfo").innerHTML = `
-        <h3>${teacher.name}</h3>
-        <p>📞 الهاتف: ${teacher.phone}</p>
-        <p>📦 العرض: ${teacher.offer} ساعة</p>
-        <p>📅 تاريخ البدء: ${teacher.startDate}</p>
-        <p>💰 المدفوع: ${teacher.amountPaid} / الإجمالي: ${teacher.totalAmount}</p>
-        <p>⏱️ الساعات المتبقية: ${teacher.remainingHours}</p>
-      `;
-      if (isExpired) {
-        document.getElementById("expiredAlert").innerHTML = '<div class="alert alert-warning">⚠️ العرض خلص، جدد العرض</div>';
-      }
-
-      let schedule = [];
-      let count = 0;
-      let bookedSlots = {};
-
-      for (let w = 0; w < durationWeeks; w++) {
-        for (let d = 0; d < 7; d++) {
-          for (let t of sessionTimes) {
-            const sessionDate = new Date(startDate);
-            sessionDate.setDate(startDate.getDate() + (w * 7 + d));
-            const dateStr = sessionDate.toISOString().split("T")[0];
-            const day = getDayName(dateStr);
-            const slotKey = `${dateStr}_${t}`;
-            const alreadyBooked = bookedSlots[slotKey] || [];
-
-            if (teacher.availability[day]?.includes(t)) {
-              if (count >= totalSessions) break;
-
-              let studio = null;
-              if (!alreadyBooked.includes("A")) {
-                studio = "A";
-                bookedSlots[slotKey] = [...alreadyBooked, "A"];
-              } else if (!alreadyBooked.includes("B")) {
-                studio = "B";
-                bookedSlots[slotKey] = [...alreadyBooked, "B"];
-              } else {
-                continue;
-              }
-
-              schedule.push({
-                week: w + 1,
-                date: dateStr,
-                day,
-                time: t,
-                studio
-              });
-
-              count++;
-            }
-          }
-        }
-      }
-      document.getElementById("scheduleList").innerHTML = schedule.map(s => `
-        <div class="schedule-card">
-          <strong>الأسبوع ${s.week}</strong> - ${s.date} (${s.day})<br>
-          ⏰ ${s.time} | 🎥 <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span>
-        </div>
-      `).join("");
+    if (!teacher) {
+      document.body.innerHTML = "<div class='container'><div class='alert alert-danger'>الأستاذ غير موجود!</div></div>";
+      throw new Error("Teacher not found");
     }
 
-    loadTeacher();
+    const totalHours = parseInt(teacher.offer);
+    const totalSessions = Math.floor(totalHours / 1.5);
+    const durationWeeks = teacher.offer === "100" ? 24 : teacher.offer === "50" ? 6 : 3;
+    const startDate = new Date(teacher.startDate);
+    const today = new Date();
+    const diffWeeks = Math.floor((today - startDate) / (7 * 24 * 60 * 60 * 1000));
+    const isExpired = teacher.remainingHours <= 0 || diffWeeks >= durationWeeks;
+
+    const teacherInfo = document.getElementById("teacherInfo");
+    teacherInfo.innerHTML = `
+      <h3>${teacher.name}</h3>
+      <p>رقم الهاتف: ${teacher.phone}</p>
+      <p>نوع العرض: ${teacher.offer} ساعة</p>
+      <p>تاريخ البدء: ${teacher.startDate}</p>
+      <p>المدفوع: ${teacher.amountPaid} - الباقي: ${teacher.totalAmount - teacher.amountPaid}</p>
+      <p>المتبقي من الساعات: ${teacher.remainingHours}</p>
+    `;
+
+    if (isExpired) {
+      document.getElementById("expiredAlert").innerHTML = '<div class="alert alert-warning">العرض خلص، جدد العرض</div>';
+    }
+    let schedule = [];
+    let sessionCount = 0;
+
+    for (let w = 0; w < durationWeeks; w++) {
+      for (let d = 0; d < days.length; d++) {
+        for (let t of sessionTimes) {
+          if (teacher.availability[days[d]]?.includes(t)) {
+            if (sessionCount >= totalSessions) break;
+            const sessionDate = new Date(startDate);
+            sessionDate.setDate(sessionDate.getDate() + (w * 7) + d);
+            schedule.push({
+              week: w + 1,
+              day: days[d],
+              time: t,
+              date: sessionDate.toLocaleDateString("ar-EG")
+            });
+            sessionCount++;
+          }
+        }
+        if (sessionCount >= totalSessions) break;
+      }
+      if (sessionCount >= totalSessions) break;
+    }
+
+    function decrease(hours) {
+      teacher.remainingHours = Math.max(0, teacher.remainingHours - hours);
+      teachers[teacherIndex] = teacher;
+      localStorage.setItem("teachers", JSON.stringify(teachers));
+      location.reload();
+    }
+
+    document.getElementById("scheduleList").innerHTML = schedule.map(s => `
+      <div class="schedule-card d-flex justify-content-between align-items-center">
+        <div>
+          <strong>الأسبوع ${s.week}</strong><br>
+          اليوم: ${s.day}<br>
+          التاريخ: ${s.date}<br>
+          الوقت: ${s.time}
+        </div>
+        <div>
+          <a href="https://wa.me/${teacher.phone}?text=مرحبا استاذ ${encodeURIComponent(teacher.name)} ننتظرك بتاريخ ${encodeURIComponent(s.date)} بساعة ${encodeURIComponent(s.time)}" target="_blank" class="btn btn-success btn-sm mb-1">💬 واتساب</a>
+        </div>
+      </div>
+    `).join("");
   </script>
 </body>
 </html>
