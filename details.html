@@ -14,9 +14,19 @@
     .alert-warning { color: red; font-weight: bold; }
     .print-area { display: none; }
     @media print {
-      body * { visibility: hidden; }
-      .print-area, .print-area * { visibility: visible; }
-      .print-area { position: absolute; top: 0; right: 0; left: 0; padding: 20px; }
+      body * { visibility: hidden !important; }
+      .print-area, .print-area * {
+        visibility: visible !important;
+        display: block !important;
+      }
+      .print-area {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        background: white;
+        padding: 20px;
+      }
     }
   </style>
 </head>
@@ -26,19 +36,8 @@
     <div id="teacherInfo" class="mb-4"></div>
     <div id="expiredAlert" class="mb-3"></div>
 
-    <!-- ✅ أزرار تنقيص الوقت -->
     <div class="mb-3">
-      <h5>⏱️ تسجيل جلسات:</h5>
-      <button class="btn btn-outline-danger btn-sm" onclick="decrease(0.5)">- نصف ساعة</button>
-      <button class="btn btn-outline-danger btn-sm" onclick="decrease(1)">- ساعة</button>
-      <button class="btn btn-outline-danger btn-sm" onclick="decrease(2)">- ساعتين</button>
-      <button class="btn btn-outline-danger btn-sm" onclick="decrease(3)">- ثلاث ساعات</button>
-      <button class="btn btn-outline-danger btn-sm" onclick="decrease(5)">- خمس ساعات</button>
-    </div>
-
-    <!-- ✅ زر طباعة -->
-    <div class="mb-4">
-      <button class="btn btn-primary" onclick="window.print()">🖨️ طباعة بيانات الأستاذ</button>
+      <button class="btn btn-outline-primary" onclick="window.print()">🖨️ طباعة بيانات الأستاذ</button>
     </div>
 
     <h4 class="mb-3">📅 جدول الجلسات</h4>
@@ -47,8 +46,8 @@
     <!-- ✅ منطقة الطباعة -->
     <div class="print-area">
       <h2>📋 تقرير الأستاذ</h2>
-      <div id="printInfo"></div>
-      <h4 class="mt-4">📅 جدول الجلسات</h4>
+      <div id="printInfo" class="mb-3"></div>
+      <h4 class="mt-3">📅 جدول الجلسات</h4>
       <div id="printSchedule"></div>
     </div>
   </div>
@@ -65,8 +64,6 @@
     const sessionTimes = ["08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00", "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"];
     const urlParams = new URLSearchParams(window.location.search);
     const teacherName = urlParams.get("teacher");
-    let teacherId = null;
-    let teacherData = null;
 
     async function loadTeacher() {
       const snapshot = await db.collection("teachers").where("name", "==", teacherName).get();
@@ -76,9 +73,7 @@
       }
 
       const doc = snapshot.docs[0];
-      teacherId = doc.id;
       const teacher = doc.data();
-      teacherData = teacher;
 
       const totalHours = parseInt(teacher.offer);
       const totalSessions = Math.floor(totalHours / 1.5);
@@ -100,8 +95,8 @@
 
       document.getElementById("printInfo").innerHTML = `
         <p><strong>الاسم:</strong> ${teacher.name}</p>
-        <p><strong>رقم الهاتف:</strong> ${teacher.phone}</p>
-        <p><strong>تاريخ البدء:</strong> ${teacher.startDate}</p>
+        <p><strong>الهاتف:</strong> ${teacher.phone}</p>
+        <p><strong>تاريخ الاشتراك:</strong> ${teacher.startDate}</p>
         <p><strong>المبلغ المتبقي:</strong> ${teacher.totalAmount - teacher.amountPaid}</p>
       `;
 
@@ -119,7 +114,6 @@
           for (let t of sessionTimes) {
             if (teacher.availability[day]?.includes(t)) {
               if (count >= totalSessions) break;
-
               const sessionDate = new Date(startDate);
               sessionDate.setDate(sessionDate.getDate() + (w * 7 + d));
               const dateStr = sessionDate.toISOString().split("T")[0];
@@ -141,31 +135,21 @@
         }
       }
 
-      const html = schedule.map(s => {
-        const msg = `مرحبا استاذ ${teacher.name} ننتظرك بتاريخ ${s.date} بساعة ${s.time}`;
-        const wa = `https://wa.me/${teacher.phone}?text=${encodeURIComponent(msg)}`;
-        return `
-          <div class="schedule-card d-flex justify-content-between align-items-center">
-            <div>
-              الأسبوع ${s.week} - 📅 ${s.date} (${s.day})<br>
-              الوقت: ${s.time} - الاستوديو: <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span>
-            </div>
-            <div>
-              <a href="${wa}" target="_blank" class="btn btn-success btn-sm">💬 واتساب</a>
-            </div>
-          </div>`;
-      }).join("");
+      // عرض الجلسات في الصفحة
+      document.getElementById("scheduleList").innerHTML = schedule.map(s => `
+        <div class="schedule-card">
+          الأسبوع ${s.week} - 📅 ${s.date} (${s.day})<br>
+          ⏰ ${s.time} - 🎥 <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span>
+        </div>
+      `).join("");
 
-      document.getElementById("scheduleList").innerHTML = html;
-      document.getElementById("printSchedule").innerHTML = html;
-    }
-
-    async function decrease(amount) {
-      if (!teacherId || !teacherData) return;
-      const updated = Math.max(0, teacherData.remainingHours - amount);
-      teacherData.remainingHours = updated;
-      await db.collection("teachers").doc(teacherId).update({ remainingHours: updated });
-      location.reload();
+      // محتوى الطباعة
+      document.getElementById("printSchedule").innerHTML = schedule.map(s => `
+        <p>
+          الأسبوع ${s.week} - ${s.date} (${s.day})<br>
+          ⏰ ${s.time} - الاستوديو: ${s.studio}
+        </p>
+      `).join("");
     }
 
     loadTeacher();
