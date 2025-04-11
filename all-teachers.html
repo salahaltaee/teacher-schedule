@@ -14,10 +14,24 @@
 <body>
   <div class="container my-4">
     <h2 class="mb-4">📋 جميع الأساتذة</h2>
+
+    <div class="row mb-4">
+      <div class="col-md-6 mb-2">
+        <input type="text" id="searchName" class="form-control" placeholder="🔍 بحث باسم الأستاذ">
+      </div>
+      <div class="col-md-6 mb-2">
+        <select id="filterOffer" class="form-select">
+          <option value="">📦 كل العروض</option>
+          <option value="15">15 ساعة</option>
+          <option value="50">50 ساعة</option>
+          <option value="100">100 ساعة</option>
+        </select>
+      </div>
+    </div>
+
     <div id="teacherList" class="row"></div>
     <a href="index.html" class="btn btn-secondary mt-3">🔙 رجوع للصفحة الرئيسية</a>
   </div>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
@@ -31,9 +45,15 @@
       const list = document.getElementById("teacherList");
       list.innerHTML = "";
 
+      const searchName = document.getElementById("searchName").value.toLowerCase();
+      const filterOffer = document.getElementById("filterOffer").value;
+
       snapshot.docs.forEach(doc => {
         const t = doc.data();
         const id = doc.id;
+
+        if (searchName && !t.name.toLowerCase().includes(searchName)) return;
+        if (filterOffer && t.offer !== filterOffer) return;
 
         const card = document.createElement("div");
         card.className = "col-md-6";
@@ -45,14 +65,18 @@
             ⏱️ المتبقي: ${t.remainingHours} ساعة
             <div class="mt-2 d-flex gap-2 flex-wrap">
               <a href="details.html?teacher=${encodeURIComponent(t.name)}" class="btn btn-sm btn-outline-primary">📄 تفاصيل</a>
+              <button onclick="editTeacher('${id}')" class="btn btn-sm btn-warning">✏️ تعديل</button>
               <button onclick="deleteTeacher('${id}')" class="btn btn-sm btn-danger">🗑️ حذف</button>
               <button onclick="decreaseHours('${id}', ${t.remainingHours})" class="btn btn-sm btn-secondary">➖ 1.5 ساعة</button>
             </div>
           </div>
         `;
-
         list.appendChild(card);
       });
+    }
+
+    function editTeacher(id) {
+      window.location.href = `edit-teacher.html?id=${id}`;
     }
 
     async function deleteTeacher(id) {
@@ -67,6 +91,9 @@
       await db.collection("teachers").doc(id).update({ remainingHours: updated });
       loadTeachers();
     }
+
+    document.getElementById("searchName").addEventListener("input", loadTeachers);
+    document.getElementById("filterOffer").addEventListener("change", loadTeachers);
 
     loadTeachers();
   </script>
