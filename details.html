@@ -15,6 +15,7 @@
   <div class="container my-4">
     <h1 class="mb-4">📋 تفاصيل الأستاذ</h1>
     <div id="teacherInfo" class="mb-4"></div>
+
     <div class="mb-3 d-flex gap-2 flex-wrap">
       <button onclick="decrease(0.5)" class="btn btn-outline-danger btn-sm">➖ نصف ساعة</button>
       <button onclick="decrease(1)" class="btn btn-outline-danger btn-sm">➖ ساعة</button>
@@ -24,6 +25,7 @@
       <button onclick="decrease(5)" class="btn btn-outline-danger btn-sm">➖ خمس ساعات</button>
       <button onclick="window.print()" class="btn btn-success btn-sm">🖨️ طباعة التفاصيل</button>
     </div>
+
     <div id="expiredAlert" class="mb-3"></div>
     <h4 class="mb-3">📅 جدول الجلسات</h4>
     <div id="scheduleList"></div>
@@ -31,7 +33,11 @@
 
   <script>
     const days = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
-    const sessionTimes = ["08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00", "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"];
+    const sessionTimes = [
+      "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
+      "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
+    ];
+
     const urlParams = new URLSearchParams(window.location.search);
     const teacherName = urlParams.get("teacher");
     const teachers = JSON.parse(localStorage.getItem("teachers") || "[]");
