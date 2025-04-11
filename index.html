@@ -2,37 +2,43 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>إدارة الأساتذة - استوديو نون</title>
+  <title>استوديو نون - إدارة الأساتذة</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
   <style>
-    body { direction: rtl; }
+    body { direction: rtl; font-family: 'Tahoma', sans-serif; }
     .btn-time.selected { background-color: #198754; color: white; }
-    .btn-time.disabled { background-color: #ccc; color: #777; cursor: not-allowed; pointer-events: none; }
+    .btn-time.disabled { background-color: #ccc; color: #777; pointer-events: none; }
     .availability-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
     .card-teacher { border: 1px solid #ccc; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
     .studio-a { color: green; font-weight: bold; }
     .studio-b { color: blue; font-weight: bold; }
+    .section-title { background: #eee; padding: 10px; border-radius: 5px; margin-top: 30px; font-weight: bold; }
     .time-label { font-weight: bold; margin-top: 10px; }
   </style>
 </head>
 <body>
   <div class="container my-4">
-    <h1 class="text-center mb-4">📚 إدارة الأساتذة</h1>
-<div class="text-end mb-3">
-  <a href="filter.html" class="btn btn-outline-primary">🔍 صفحة الفلاتر</a>
-</div>
 
-    <!-- ✅ رسالة وقت وتاريخ حي -->
-    <div class="text-center mb-3">
-      <strong>⏰ الوقت الحالي:</strong> <span id="liveClock"></span>
+    <!-- 🔷 عنوان الصفحة -->
+    <h1 class="text-center mb-4">📚 إدارة الأساتذة - استوديو نون</h1>
+
+    <!-- ⏰ التاريخ والساعة الحية -->
+    <div class="text-center mb-4">
+      <strong>📅 التاريخ:</strong> <span id="liveDate"></span>
+      | <strong>⏰ الساعة:</strong> <span id="liveClock"></span>
     </div>
 
-    <!-- ✅ رسالة حالة تعديل أستاذ -->
+    <!-- 🔍 زر صفحة الفلاتر -->
+    <div class="text-end mb-3">
+      <a href="filter.html" class="btn btn-outline-primary">🔍 صفحة الفلاتر</a>
+    </div>
+
+    <!-- 🧾 إشعار تعديل -->
     <div id="editNotice" class="alert alert-info d-none"></div>
 
-    <!-- ✅ نموذج إضافة / تعديل أستاذ -->
+    <!-- 🧑‍🏫 نموذج إضافة أو تعديل أستاذ -->
     <div class="card mb-4">
       <div class="card-body">
         <h4 class="card-title mb-3">➕ إضافة أستاذ</h4>
@@ -52,8 +58,9 @@
           <div class="col-md-6 mb-3"><label>المبلغ الإجمالي</label><input type="number" id="total" class="form-control" /></div>
         </div>
 
-        <h6 class="mt-3">🕐 اختر الأيام والأوقات المتاحة (كل وقت يُستخدم مرتين فقط):</h6>
+        <h6 class="mt-3">🕐 اختر الأيام والأوقات المتاحة (كل وقت يمكن استخدامه مرتين فقط):</h6>
         <div id="availability-container" class="mt-2"></div>
+
         <button onclick="saveTeacher()" class="btn btn-success mt-3">✅ حفظ الأستاذ</button>
       </div>
     </div>
@@ -65,23 +72,29 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
   const sessionTimes = [
     "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
     "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
   ];
 
-  let usageMap = {};         // يحتوي عدّاد عدد مرات استخدام كل وقت
-  let availability = {};     // أوقات التوفر للأستاذ الجاري إضافته/تعديله
-  let editId = null;         // للتعديل
+  let usageMap = {};         // عدد مرات استخدام كل وقت
+  let availability = {};     // الأوقات المختارة للأستاذ
+  let editId = null;         // ID الأستاذ في حالة التعديل
 
-  // دالة لإنشاء واجهة اختيار الأوقات
+  // ⏰ ساعة حية وتاريخ
+  setInterval(() => {
+    const now = new Date();
+    document.getElementById("liveClock").textContent = now.toLocaleTimeString("ar-EG");
+    document.getElementById("liveDate").textContent = now.toLocaleDateString("ar-EG");
+  }, 1000);
+
+  // 🔁 رسم أوقات التوفر + حساب الاستخدام
   async function renderAvailability() {
     const container = document.getElementById("availability-container");
     container.innerHTML = "";
     usageMap = {};
 
-    // جلب كل الأساتذة لاحتساب عدد مرات استخدام كل وقت
     const snapshot = await db.collection("teachers").get();
     snapshot.docs.forEach(doc => {
       const data = doc.data();
@@ -93,7 +106,6 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
       }
     });
 
-    // رسم الأزرار حسب عدد الاستخدام
     days.forEach(day => {
       const row = document.createElement("div");
       row.className = "availability-grid";
@@ -139,6 +151,9 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
   }
 
   renderAvailability();
+</script>
+<script>
+  // ✅ حفظ أو تعديل أستاذ
   async function saveTeacher() {
     const name = document.getElementById("name").value.trim();
     const phone = document.getElementById("phone").value.trim();
@@ -172,6 +187,7 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
     location.reload();
   }
 
+  // ✅ تحميل الأساتذة
   async function loadTeachers() {
     const snapshot = await db.collection("teachers").get();
     const list = document.getElementById("teacherList");
@@ -185,16 +201,18 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
             يبدأ: ${t.startDate}<br>
             المدفوع: ${t.amountPaid} / ${t.totalAmount}<br>
             المتبقي: ${t.remainingHours} ساعة
-            <div class="mt-2">
+            <div class="mt-2 d-flex gap-2 flex-wrap">
               <a href="details.html?teacher=${encodeURIComponent(t.name)}" class="btn btn-sm btn-outline-primary">📄 تفاصيل</a>
               <button onclick="editTeacher('${doc.id}')" class="btn btn-sm btn-warning">✏️ تعديل</button>
               <button onclick="deleteTeacher('${doc.id}')" class="btn btn-sm btn-danger">🗑️ حذف</button>
+              <button onclick="logSession('${doc.id}', ${t.remainingHours})" class="btn btn-sm btn-secondary">➖ جلسة (1.5س)</button>
             </div>
           </div>
         </div>`;
     }).join("");
   }
 
+  // ✅ حذف أستاذ
   async function deleteTeacher(id) {
     if (confirm("هل أنت متأكد من الحذف؟")) {
       await db.collection("teachers").doc(id).delete();
@@ -203,6 +221,7 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
     }
   }
 
+  // ✅ تعديل أستاذ
   async function editTeacher(id) {
     const doc = await db.collection("teachers").doc(id).get();
     const t = doc.data();
@@ -219,7 +238,35 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
     renderAvailability();
   }
 
+  // ✅ تقليل جلسة
+  async function logSession(id, currentHours) {
+    const updated = Math.max(0, currentHours - 1.5);
+    await db.collection("teachers").doc(id).update({ remainingHours: updated });
+    loadTeachers();
+  }
+
   loadTeachers();
+</script>
+<!-- 🧑‍🏫 قائمة الأساتذة -->
+<div class="section-title">👨‍🏫 قائمة الأساتذة</div>
+<div id="teacherList" class="row mt-3"></div>
+
+<!-- 📅 من سيصور اليوم -->
+<div class="section-title">📅 من سيصور اليوم</div>
+<ul id="todayList" class="list-group mb-4"></ul>
+
+<div class="row">
+  <div class="col-md-6">
+    <h5>🎥 استوديو A</h5>
+    <div id="studioA" class="border p-3 rounded bg-light"></div>
+  </div>
+  <div class="col-md-6">
+    <h5>🎥 استوديو B</h5>
+    <div id="studioB" class="border p-3 rounded bg-light"></div>
+  </div>
+</div>
+
+<script>
   async function showTodaySchedule() {
     const snapshot = await db.collection("teachers").get();
     const teachers = snapshot.docs.map(doc => doc.data());
@@ -237,26 +284,27 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
       for (let w = 0; w < weeks; w++) {
         for (let d = 0; d < 7; d++) {
           for (let t of sessionTimes) {
-            const day = days[d];
+            const sessionDate = new Date(startDate);
+            sessionDate.setDate(startDate.getDate() + (w * 7 + d));
+            const jsDay = sessionDate.getDay();
+            const day = days[jsDay];
+            const dateStr = sessionDate.toISOString().split("T")[0];
+            const studio = studios[studioToggle % 2];
+
             if (teacher.availability[day]?.includes(t)) {
               if (count >= sessions) break;
-              const sessionDate = new Date(startDate);
-              sessionDate.setDate(sessionDate.getDate() + (w * 7 + d));
-              const dateStr = sessionDate.toISOString().split("T")[0];
-              const studio = studios[studioToggle % 2];
               const key = `${dateStr}_${t}_${studio}`;
               if (!booked[key]) {
                 booked[key] = true;
                 results.push({
-                  week: w + 1,
+                  teacher: teacher.name,
                   date: dateStr,
-                  day: days[sessionDate.getDay()],
                   time: t,
                   studio,
-                  teacher: teacher.name
+                  day: day
                 });
-                count++;
                 studioToggle++;
+                count++;
               }
             }
           }
@@ -272,7 +320,6 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
     const list = document.getElementById("todayList");
     const studioA = document.getElementById("studioA");
     const studioB = document.getElementById("studioB");
-    document.getElementById("todayDate").textContent = today.toLocaleDateString("ar-EG");
 
     list.innerHTML = todaySessions.map(s =>
       `<li class="list-group-item">${s.teacher} - ${s.time} - استوديو ${s.studio}</li>`
@@ -296,36 +343,8 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
   }
 
   showTodaySchedule();
-
-  // ⏱️ ساعة حية
-  setInterval(() => {
-    const now = new Date();
-    document.getElementById("liveClock").textContent = now.toLocaleTimeString("ar-EG");
-  }, 1000);
 </script>
-    <!-- ✅ قائمة الأساتذة -->
-    <div>
-      <h4 class="mb-3">👨‍🏫 قائمة الأساتذة</h4>
-      <div id="teacherList" class="row"></div>
-    </div>
 
-    <!-- ✅ من سيصور اليوم -->
-    <div class="my-5">
-      <h4>📅 من سيصور اليوم <span id="todayDate"></span> 🕒 <span id="liveClock"></span></h4>
-      <ul id="todayList" class="list-group mb-4"></ul>
-
-      <div class="row">
-        <div class="col-md-6">
-          <h5>🎥 استوديو A</h5>
-          <div id="studioA" class="border p-3 rounded bg-light"></div>
-        </div>
-        <div class="col-md-6">
-          <h5>🎥 استوديو B</h5>
-          <div id="studioB" class="border p-3 rounded bg-light"></div>
-        </div>
-      </div>
-    </div>
-
-  </div> <!-- end container -->
+</div> <!-- نهاية container -->
 </body>
 </html>
