@@ -203,7 +203,7 @@
             المدفوع: ${t.amountPaid} / ${t.totalAmount}<br>
             المتبقي: ${t.remainingHours} ساعة
             <div class="mt-2 d-flex gap-2 flex-wrap">
-              <a href="details.html?teacher=${encodeURIComponent(t.name)}" class="btn btn-sm btn-outline-primary">📄 تفاصيل</a>
+             <a href="details.html?teacher=${encodeURIComponent(t.name)}" class="btn btn-sm btn-outline-primary">📄 تفاصيل</a>
               <button onclick="editTeacher('${doc.id}')" class="btn btn-sm btn-warning">✏️ تعديل</button>
               <button onclick="deleteTeacher('${doc.id}')" class="btn btn-sm btn-danger">🗑️ حذف</button>
               <button onclick="logSession('${doc.id}', ${t.remainingHours})" class="btn btn-sm btn-secondary">➖ جلسة (1.5س)</button>
