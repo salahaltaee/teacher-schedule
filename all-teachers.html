@@ -32,6 +32,7 @@
     <div id="teacherList" class="row"></div>
     <a href="index.html" class="btn btn-secondary mt-3">🔙 رجوع للصفحة الرئيسية</a>
   </div>
+
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
@@ -47,6 +48,7 @@
 
       const searchName = document.getElementById("searchName").value.toLowerCase();
       const filterOffer = document.getElementById("filterOffer").value;
+      const today = new Date();
 
       snapshot.docs.forEach(doc => {
         const t = doc.data();
@@ -54,6 +56,12 @@
 
         if (searchName && !t.name.toLowerCase().includes(searchName)) return;
         if (filterOffer && t.offer !== filterOffer) return;
+
+        const originalHours = parseInt(t.offer);
+        const completedSessions = ((originalHours - t.remainingHours) / 1.5).toFixed(0);
+        const remainingSessions = (t.remainingHours / 1.5).toFixed(0);
+        const startDate = new Date(t.startDate);
+        const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
 
         const card = document.createElement("div");
         card.className = "col-md-6";
@@ -63,14 +71,21 @@
             📞 ${t.phone} | يبدأ: ${t.startDate}<br>
             💰 ${t.amountPaid} / ${t.totalAmount}<br>
             ⏱️ المتبقي: ${t.remainingHours} ساعة
+            <div class="mt-2 text-muted small">
+              📈 الجلسات المنجزة: ${completedSessions} جلسة<br>
+              ⏳ الجلسات المتبقية: ${remainingSessions} جلسة<br>
+              🗓️ منذ بدء الاشتراك: ${daysSinceStart} يومًا
+            </div>
             <div class="mt-2 d-flex gap-2 flex-wrap">
               <a href="details.html?teacher=${encodeURIComponent(t.name)}" class="btn btn-sm btn-outline-primary">📄 تفاصيل</a>
               <button onclick="editTeacher('${id}')" class="btn btn-sm btn-warning">✏️ تعديل</button>
               <button onclick="deleteTeacher('${id}')" class="btn btn-sm btn-danger">🗑️ حذف</button>
               <button onclick="decreaseHours('${id}', ${t.remainingHours})" class="btn btn-sm btn-secondary">➖ 1.5 ساعة</button>
+              <a href="https://wa.me/${t.phone}?text=${encodeURIComponent('مرحبا استاذ ' + t.name + ' اهلا وسهلا بك في عائلة نون')}" target="_blank" class="btn btn-sm btn-success">💬 ترحيب واتساب</a>
             </div>
           </div>
         `;
+
         list.appendChild(card);
       });
     }
