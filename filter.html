@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>فلترة الجلسات</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+  <style>
+    body { direction: rtl; }
+    .filter-box { border: 1px solid #ddd; padding: 20px; margin-bottom: 20px; border-radius: 8px; background: #f9f9f9; }
+    .session-card { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+    .studio-a { color: green; font-weight: bold; }
+    .studio-b { color: blue; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container my-4">
+    <h2 class="mb-4">🔍 صفحة الفلاتر</h2>
+
+    <div class="filter-box">
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label>اختر الأستاذ:</label>
+          <select id="teacherFilter" class="form-select">
+            <option value="">الكل</option>
+          </select>
+        </div>
+
+        <div class="col-md-4 mb-3">
+          <label>من تاريخ:</label>
+          <input type="date" id="startDateFilter" class="form-control">
+        </div>
+
+        <div class="col-md-4 mb-3">
+          <label>إلى تاريخ:</label>
+          <input type="date" id="endDateFilter" class="form-control">
+        </div>
+
+        <div class="col-md-4 mb-3">
+          <label>اختر اليوم:</label>
+          <select id="dayFilter" class="form-select">
+            <option value="">الكل</option>
+            <option value="السبت">السبت</option>
+            <option value="الأحد">الأحد</option>
+            <option value="الاثنين">الاثنين</option>
+            <option value="الثلاثاء">الثلاثاء</option>
+            <option value="الأربعاء">الأربعاء</option>
+            <option value="الخميس">الخميس</option>
+            <option value="الجمعة">الجمعة</option>
+          </select>
+        </div>
+
+        <div class="col-md-4 mb-3">
+          <label>اختر الاستوديو:</label>
+          <select id="studioFilter" class="form-select">
+            <option value="">الكل</option>
+            <option value="A">استوديو A</option>
+            <option value="B">استوديو B</option>
+          </select>
+        </div>
+
+        <div class="col-md-4 mb-3 d-grid">
+          <label>&nbsp;</label>
+          <button onclick="applyFilters()" class="btn btn-primary">🔍 تنفيذ الفلترة</button>
+        </div>
+      </div>
+    </div>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
+    projectId: "noon-a0b62"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const days = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+  const sessionTimes = [
+    "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
+    "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
+  ];
+
+  let allSessions = [];
+
+  async function loadData() {
+    const snapshot = await db.collection("teachers").get();
+    const teacherSelect = document.getElementById("teacherFilter");
+    allSessions = [];
+
+    snapshot.docs.forEach(doc => {
+      const t = doc.data();
+      const durationWeeks = t.offer === "100" ? 24 : t.offer === "50" ? 6 : 3;
+      const totalSessions = Math.floor(parseInt(t.offer) / 1.5);
+      const startDate = new Date(t.startDate);
+      let count = 0;
+      let studioToggle = 0;
+
+      const option = document.createElement("option");
+      option.value = t.name;
+      option.textContent = t.name;
+      teacherSelect.appendChild(option);
+
+      for (let w = 0; w < durationWeeks; w++) {
+        for (let d = 0; d < 7; d++) {
+          for (let time of sessionTimes) {
+            if (t.availability[days[d]]?.includes(time)) {
+              if (count >= totalSessions) break;
+
+              const sessionDate = new Date(startDate);
+              sessionDate.setDate(sessionDate.getDate() + (w * 7 + d));
+              const dateStr = sessionDate.toISOString().split("T")[0];
+              const studio = studioToggle % 2 === 0 ? "A" : "B";
+              studioToggle++;
+
+              allSessions.push({
+                teacher: t.name,
+                phone: t.phone,
+                date: dateStr,
+                day: days[sessionDate.getDay()],
+                time: time,
+                studio
+              });
+
+              count++;
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function applyFilters() {
+    const teacherVal = document.getElementById("teacherFilter").value;
+    const startVal = document.getElementById("startDateFilter").value;
+    const endVal = document.getElementById("endDateFilter").value;
+    const dayVal = document.getElementById("dayFilter").value;
+    const studioVal = document.getElementById("studioFilter").value;
+
+    let filtered = allSessions;
+
+    if (teacherVal) filtered = filtered.filter(s => s.teacher === teacherVal);
+    if (startVal) filtered = filtered.filter(s => s.date >= startVal);
+    if (endVal) filtered = filtered.filter(s => s.date <= endVal);
+    if (dayVal) filtered = filtered.filter(s => s.day === dayVal);
+    if (studioVal) filtered = filtered.filter(s => s.studio === studioVal);
+
+    displayResults(filtered);
+  }
+
+  function displayResults(data) {
+    const out = document.getElementById("filteredResults");
+    if (data.length === 0) {
+      out.innerHTML = `<div class="alert alert-warning">لا توجد نتائج مطابقة.</div>`;
+      return;
+    }
+
+    out.innerHTML = data.map(s => `
+      <div class="session-card">
+        👨‍🏫 ${s.teacher} | 📅 ${s.date} (${s.day})<br>
+        ⏰ ${s.time} | 🎥 <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span>
+      </div>
+    `).join("");
+  }
+
+  loadData();
+</script>
+</body>
+</html>
+
+    <div id="filteredResults"></div>
