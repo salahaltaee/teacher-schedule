@@ -30,103 +30,110 @@
     <h4 class="mb-3">📅 جدول الجلسات</h4>
     <div id="scheduleList"></div>
   </div>
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
-      projectId: "noon-a0b62"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
+    projectId: "noon-a0b62"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-    const days = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
-    const sessionTimes = [
-      "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
-      "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
-    ];
+  const days = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+  const sessionTimes = [
+    "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
+    "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
+  ];
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const teacherId = urlParams.get("id");
-    let teacher;
+  const urlParams = new URLSearchParams(window.location.search);
+  const teacherId = urlParams.get("id");
+  let teacher;
 
-    async function loadTeacher() {
-      const doc = await db.collection("teachers").doc(teacherId).get();
-      if (!doc.exists) {
-        document.body.innerHTML = "<div class='container'><div class='alert alert-danger'>الأستاذ غير موجود!</div></div>";
-        throw new Error("Teacher not found");
-      }
-      teacher = doc.data();
-
-      const offerWeeks = teacher.offer === "100" ? 24 : teacher.offer === "50" ? 6 : 3;
-      const totalSessions = Math.floor(parseInt(teacher.offer) / 1.5);
-      const startDate = new Date(teacher.startDate);
-      const today = new Date();
-      const diffWeeks = Math.floor((today - startDate) / (7 * 24 * 60 * 60 * 1000));
-      const isExpired = teacher.remainingHours <= 0 || diffWeeks >= offerWeeks;
-
-      document.getElementById("teacherInfo").innerHTML = `
-        <h3>${teacher.name}</h3>
-        <p>رقم الهاتف: ${teacher.phone}</p>
-        <p>نوع العرض: ${teacher.offer} ساعة</p>
-        <p>تاريخ البدء: ${teacher.startDate}</p>
-        <p>المدفوع: ${teacher.amountPaid} - الباقي: ${teacher.totalAmount - teacher.amountPaid}</p>
-        <p>المتبقي من الساعات: ${teacher.remainingHours}</p>
-      `;
-
-      if (isExpired) {
-        document.getElementById("expiredAlert").innerHTML = '<div class="alert alert-warning">العرض خلص، جدد العرض</div>';
-      }
-
-      generateSchedule(startDate, totalSessions, offerWeeks);
+  async function loadTeacher() {
+    const doc = await db.collection("teachers").doc(teacherId).get();
+    if (!doc.exists) {
+      document.body.innerHTML = "<div class='container'><div class='alert alert-danger'>الأستاذ غير موجود!</div></div>";
+      throw new Error("Teacher not found");
     }
-    function generateSchedule(startDate, totalSessions, offerWeeks) {
-      let schedule = [];
-      let sessionCount = 0;
+    teacher = doc.data();
 
-      for (let w = 0; w < offerWeeks; w++) {
-        for (let d = 0; d < days.length; d++) {
-          for (let t of sessionTimes) {
-            if (teacher.availability[days[d]]?.includes(t)) {
-              if (sessionCount >= totalSessions) break;
-              const sessionDate = new Date(startDate);
-              sessionDate.setDate(sessionDate.getDate() + (w * 7) + d);
-              schedule.push({
-                week: w + 1,
-                day: days[d],
-                time: t,
-                date: sessionDate.toLocaleDateString("ar-EG")
-              });
-              sessionCount++;
-            }
+    const offerWeeks = teacher.offer === "100" ? 24 : teacher.offer === "50" ? 6 : 3;
+    const totalSessions = Math.floor(parseInt(teacher.offer) / 1.5);
+    const startDate = new Date(teacher.startDate);
+    const today = new Date();
+    const diffWeeks = Math.floor((today - startDate) / (7 * 24 * 60 * 60 * 1000));
+    const isExpired = teacher.remainingHours <= 0 || diffWeeks >= offerWeeks;
+
+    document.getElementById("teacherInfo").innerHTML = `
+      <h3>${teacher.name}</h3>
+      <p>رقم الهاتف: ${teacher.phone}</p>
+      <p>نوع العرض: ${teacher.offer} ساعة</p>
+      <p>تاريخ البدء: ${teacher.startDate}</p>
+      <p>المدفوع: ${teacher.amountPaid} - الباقي: ${teacher.totalAmount - teacher.amountPaid}</p>
+      <p>المتبقي من الساعات: ${teacher.remainingHours}</p>
+    `;
+
+    if (isExpired) {
+      document.getElementById("expiredAlert").innerHTML = '<div class="alert alert-warning">العرض خلص، جدد العرض</div>';
+    }
+
+    generateSchedule(startDate, totalSessions, offerWeeks);
+  }
+
+  function getDayName(date) {
+    return date.toLocaleDateString("ar-EG", { weekday: 'long' });
+  }
+  function generateSchedule(startDate, totalSessions, offerWeeks) {
+    let schedule = [];
+    let sessionCount = 0;
+    const start = new Date(startDate);
+
+    for (let w = 0; w < offerWeeks; w++) {
+      for (let offset = 0; offset < 7; offset++) {
+        const date = new Date(start);
+        date.setDate(start.getDate() + (w * 7) + offset);
+        const dayName = getDayName(date);
+        const availableTimes = teacher.availability[dayName];
+        if (availableTimes && availableTimes.length > 0) {
+          for (let t of availableTimes) {
+            if (sessionCount >= totalSessions) break;
+            schedule.push({
+              week: w + 1,
+              day: dayName,
+              date: date.toLocaleDateString("ar-EG"),
+              time: t
+            });
+            sessionCount++;
           }
-          if (sessionCount >= totalSessions) break;
         }
         if (sessionCount >= totalSessions) break;
       }
+      if (sessionCount >= totalSessions) break;
+    }
 
-      document.getElementById("scheduleList").innerHTML = schedule.map(s => `
-        <div class="schedule-card d-flex justify-content-between align-items-center">
-          <div>
-            <strong>الأسبوع ${s.week}</strong><br>
-            اليوم: ${s.day}<br>
-            التاريخ: ${s.date}<br>
-            الوقت: ${s.time}
-          </div>
-          <div>
-            <a href="https://wa.me/${teacher.phone}?text=مرحبا استاذ ${encodeURIComponent(teacher.name)} ننتظرك بتاريخ ${encodeURIComponent(s.date)} بساعة ${encodeURIComponent(s.time)}" target="_blank" class="btn btn-success btn-sm mb-1">💬 واتساب</a>
-          </div>
+    document.getElementById("scheduleList").innerHTML = schedule.map(s => `
+      <div class="schedule-card d-flex justify-content-between align-items-center">
+        <div>
+          <strong>الأسبوع ${s.week}</strong><br>
+          اليوم: ${s.day}<br>
+          التاريخ: ${s.date}<br>
+          الوقت: ${s.time}
         </div>
-      `).join("");
-    }
+        <div>
+          <a href="https://wa.me/${teacher.phone}?text=مرحبا استاذ ${encodeURIComponent(teacher.name)} ننتظرك بتاريخ ${encodeURIComponent(s.date)} بساعة ${encodeURIComponent(s.time)}" target="_blank" class="btn btn-success btn-sm mb-1">💬 واتساب</a>
+        </div>
+      </div>
+    `).join("");
+  }
 
-    async function decrease(hours) {
-      const newHours = Math.max(0, teacher.remainingHours - hours);
-      await db.collection("teachers").doc(teacherId).update({
-        remainingHours: newHours
-      });
-      location.reload();
-    }
+  async function decrease(hours) {
+    const newHours = Math.max(0, teacher.remainingHours - hours);
+    await db.collection("teachers").doc(teacherId).update({
+      remainingHours: newHours
+    });
+    location.reload();
+  }
 
-    loadTeacher();
-  </script>
+  loadTeacher();
+</script>
 </body>
 </html>
