@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>تعديل بيانات الأستاذ</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+  <style>
+    body { direction: rtl; }
+  </style>
+</head>
+<body>
+  <div class="container my-4">
+    <h2 class="mb-4">✏️ تعديل بيانات الأستاذ</h2>
+    <form id="editForm">
+      <div class="mb-3">
+        <label for="name" class="form-label">اسم الأستاذ</label>
+        <input type="text" class="form-control" id="name" required>
+      </div>
+      <div class="mb-3">
+        <label for="phone" class="form-label">رقم الهاتف</label>
+        <input type="text" class="form-control" id="phone" required>
+      </div>
+      <div class="mb-3">
+        <label for="offer" class="form-label">نوع العرض</label>
+        <select class="form-select" id="offer" required>
+          <option value="15">15 ساعة</option>
+          <option value="50">50 ساعة</option>
+          <option value="100">100 ساعة</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label for="startDate" class="form-label">تاريخ البدء</label>
+        <input type="date" class="form-control" id="startDate" required>
+      </div>
+      <div class="mb-3">
+        <label for="amountPaid" class="form-label">المبلغ المدفوع</label>
+        <input type="number" class="form-control" id="amountPaid" required>
+      </div>
+      <div class="mb-3">
+        <label for="totalAmount" class="form-label">المبلغ الإجمالي</label>
+        <input type="number" class="form-control" id="totalAmount" required>
+      </div>
+      <div class="mb-3">
+        <label for="remainingHours" class="form-label">الساعات المتبقية</label>
+        <input type="number" class="form-control" id="remainingHours" required>
+      </div>
+      <button type="submit" class="btn btn-primary">💾 حفظ التعديلات</button>
+      <a href="all-teachers.html" class="btn btn-secondary">🔙 رجوع</a>
+    </form>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
+      projectId: "noon-a0b62"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const teacherId = urlParams.get("id");
+
+    const nameInput = document.getElementById("name");
+    const phoneInput = document.getElementById("phone");
+    const offerInput = document.getElementById("offer");
+    const startDateInput = document.getElementById("startDate");
+    const amountPaidInput = document.getElementById("amountPaid");
+    const totalAmountInput = document.getElementById("totalAmount");
+    const remainingHoursInput = document.getElementById("remainingHours");
+
+    async function loadTeacher() {
+      const doc = await db.collection("teachers").doc(teacherId).get();
+      if (!doc.exists) {
+        alert("الأستاذ غير موجود!");
+        window.location.href = "all-teachers.html";
+        return;
+      }
+      const t = doc.data();
+      nameInput.value = t.name;
+      phoneInput.value = t.phone;
+      offerInput.value = t.offer;
+      startDateInput.value = t.startDate;
+      amountPaidInput.value = t.amountPaid;
+      totalAmountInput.value = t.totalAmount;
+      remainingHoursInput.value = t.remainingHours;
+    }
+
+    document.getElementById("editForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await db.collection("teachers").doc(teacherId).update({
+        name: nameInput.value,
+        phone: phoneInput.value,
+        offer: offerInput.value,
+        startDate: startDateInput.value,
+        amountPaid: parseFloat(amountPaidInput.value),
+        totalAmount: parseFloat(totalAmountInput.value),
+        remainingHours: parseFloat(remainingHoursInput.value)
+      });
+      alert("تم حفظ التعديلات بنجاح!");
+      window.location.href = "all-teachers.html";
+    });
+
+    loadTeacher();
+  </script>
+</body>
+</html>
