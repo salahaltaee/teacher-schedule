@@ -41,13 +41,13 @@
           <label>اختر اليوم:</label>
           <select id="dayFilter" class="form-select">
             <option value="">الكل</option>
-            <option value="السبت">السبت</option>
             <option value="الأحد">الأحد</option>
             <option value="الاثنين">الاثنين</option>
             <option value="الثلاثاء">الثلاثاء</option>
             <option value="الأربعاء">الأربعاء</option>
             <option value="الخميس">الخميس</option>
             <option value="الجمعة">الجمعة</option>
+            <option value="السبت">السبت</option>
           </select>
         </div>
 
@@ -66,6 +66,8 @@
         </div>
       </div>
     </div>
+
+    <div id="filteredResults"></div>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
@@ -74,7 +76,7 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-  const days = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+  const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
   const sessionTimes = [
     "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
     "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
@@ -86,6 +88,7 @@
     const snapshot = await db.collection("teachers").get();
     const teacherSelect = document.getElementById("teacherFilter");
     allSessions = [];
+    const bookedSlots = {}; // لمنع التكرار في نفس الوقت
 
     snapshot.docs.forEach(doc => {
       const t = doc.data();
@@ -93,7 +96,6 @@
       const totalSessions = Math.floor(parseInt(t.offer) / 1.5);
       const startDate = new Date(t.startDate);
       let count = 0;
-      let studioToggle = 0;
 
       const option = document.createElement("option");
       option.value = t.name;
@@ -103,20 +105,33 @@
       for (let w = 0; w < durationWeeks; w++) {
         for (let d = 0; d < 7; d++) {
           for (let time of sessionTimes) {
-            if (t.availability[days[d]]?.includes(time)) {
+            const sessionDate = new Date(startDate);
+            sessionDate.setDate(startDate.getDate() + (w * 7 + d));
+            const dateStr = sessionDate.toISOString().split("T")[0];
+            const jsDay = sessionDate.getDay();
+            const dayName = days[jsDay];
+            const slotKey = `${dateStr}_${time}`;
+            const alreadyBooked = bookedSlots[slotKey] || [];
+
+            if (t.availability[dayName]?.includes(time)) {
               if (count >= totalSessions) break;
 
-              const sessionDate = new Date(startDate);
-              sessionDate.setDate(sessionDate.getDate() + (w * 7 + d));
-              const dateStr = sessionDate.toISOString().split("T")[0];
-              const studio = studioToggle % 2 === 0 ? "A" : "B";
-              studioToggle++;
+              let studio = null;
+              if (!alreadyBooked.includes("A")) {
+                studio = "A";
+                bookedSlots[slotKey] = [...alreadyBooked, "A"];
+              } else if (!alreadyBooked.includes("B")) {
+                studio = "B";
+                bookedSlots[slotKey] = [...alreadyBooked, "B"];
+              } else {
+                continue;
+              }
 
               allSessions.push({
                 teacher: t.name,
                 phone: t.phone,
                 date: dateStr,
-                day: days[sessionDate.getDay()],
+                day: dayName,
                 time: time,
                 studio
               });
@@ -162,9 +177,8 @@
     `).join("");
   }
 
+  // تشغيل التحميل عند فتح الصفحة
   loadData();
 </script>
 </body>
 </html>
-
-    <div id="filteredResults"></div>
