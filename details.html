@@ -35,17 +35,15 @@
     <h1 class="mb-4">📋 تفاصيل الأستاذ</h1>
     <div id="teacherInfo" class="mb-4"></div>
     <div id="expiredAlert" class="mb-3"></div>
-<div class="mb-4">
-  <a href="index.html" class="btn btn-secondary">🔙 رجوع إلى الصفحة الرئيسية</a>
-</div>
+
     <div class="mb-3">
       <button class="btn btn-outline-primary" onclick="window.print()">🖨️ طباعة بيانات الأستاذ</button>
+      <a href="index.html" class="btn btn-secondary">🔙 رجوع إلى الصفحة الرئيسية</a>
     </div>
 
     <h4 class="mb-3">📅 جدول الجلسات</h4>
     <div id="scheduleList"></div>
 
-    <!-- ✅ منطقة الطباعة -->
     <div class="print-area">
       <h2>📋 تقرير الأستاذ</h2>
       <div id="printInfo" class="mb-3"></div>
@@ -62,7 +60,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+    const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
     const sessionTimes = ["08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00", "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"];
     const urlParams = new URLSearchParams(window.location.search);
     const teacherName = urlParams.get("teacher");
@@ -106,55 +104,67 @@ const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربع�
         document.getElementById("expiredAlert").innerHTML = `<div class="alert alert-warning">⚠️ العرض خلص، جدد العرض</div>`;
       }
 
-     let schedule = [];
-let count = 0;
-let studioToggle = 0;
+      let schedule = [];
+      let count = 0;
+      let bookedSlots = {};
 
-for (let w = 0; w < durationWeeks; w++) {
-  for (let d = 0; d < 7; d++) {
-    for (let t of sessionTimes) {
-      const sessionDate = new Date(startDate);
-      sessionDate.setDate(startDate.getDate() + w * 7 + d);
+      for (let w = 0; w < durationWeeks; w++) {
+        for (let d = 0; d < 7; d++) {
+          for (let t of sessionTimes) {
+            const sessionDate = new Date(startDate);
+            sessionDate.setDate(startDate.getDate() + (w * 7 + d));
+            const dateStr = sessionDate.toISOString().split("T")[0];
+            const jsDay = sessionDate.getDay();
+            const day = days[jsDay];
+            const slotKey = `${dateStr}_${t}`;
+            const alreadyBooked = bookedSlots[slotKey] || [];
 
-      const jsDay = sessionDate.getDay(); // Sunday = 0
-      const dayName = days[jsDay];
-      const dateStr = sessionDate.toISOString().split("T")[0];
+            if (teacher.availability[day]?.includes(t)) {
+              if (count >= totalSessions) break;
 
-      if (teacher.availability[dayName]?.includes(t)) {
-        if (count >= totalSessions) break;
+              let studio = null;
+              if (!alreadyBooked.includes("A")) {
+                studio = "A";
+                bookedSlots[slotKey] = [...alreadyBooked, "A"];
+              } else if (!alreadyBooked.includes("B")) {
+                studio = "B";
+                bookedSlots[slotKey] = [...alreadyBooked, "B"];
+              } else {
+                continue;
+              }
 
-        const studio = studioToggle % 2 === 0 ? "A" : "B";
-        studioToggle++;
+              schedule.push({
+                week: w + 1,
+                date: dateStr,
+                day,
+                time: t,
+                studio
+              });
 
-        schedule.push({
-          week: w + 1,
-          date: dateStr,
-          day: dayName,
-          time: t,
-          studio
-        });
-
-        count++;
+              count++;
+            }
+          }
+        }
       }
-    }
-  }
-}
 
+      document.getElementById("scheduleList").innerHTML = schedule.map(s => {
+        const msg = `مرحبا استاذ ${teacher.name} ننتظرك بتاريخ ${s.date} بساعة ${s.time}`;
+        const wa = `https://wa.me/${teacher.phone}?text=${encodeURIComponent(msg)}`;
+        return `
+          <div class="schedule-card d-flex justify-content-between align-items-center">
+            <div>
+              الأسبوع ${s.week} - 📅 ${s.date} (${s.day})<br>
+              الوقت: ${s.time} - الاستوديو: <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span>
+            </div>
+            <div>
+              <a href="${wa}" target="_blank" class="btn btn-success btn-sm">💬 واتساب</a>
+            </div>
+          </div>`;
+      }).join("");
 
-      // عرض الجلسات في الصفحة
-      document.getElementById("scheduleList").innerHTML = schedule.map(s => `
-        <div class="schedule-card">
-          الأسبوع ${s.week} - 📅 ${s.date} (${s.day})<br>
-          ⏰ ${s.time} - 🎥 <span class="${s.studio === 'A' ? 'studio-a' : 'studio-b'}">${s.studio}</span>
-        </div>
-      `).join("");
-
-      // محتوى الطباعة
       document.getElementById("printSchedule").innerHTML = schedule.map(s => `
-        <p>
-          الأسبوع ${s.week} - ${s.date} (${s.day})<br>
-          ⏰ ${s.time} - الاستوديو: ${s.studio}
-        </p>
+        <p>الأسبوع ${s.week} - ${s.date} (${s.day})<br>
+        ⏰ ${s.time} - الاستوديو: ${s.studio}</p>
       `).join("");
     }
 
