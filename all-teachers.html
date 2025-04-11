@@ -1,37 +1,25 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8">
-  <title>قائمة الأساتذة</title>
+  <meta charset="UTF-8" />
+  <title>كل الأساتذة</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
   <style>
     body { direction: rtl; }
-    .card-teacher { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+    .teacher-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
+    .status-green { color: green; font-weight: bold; }
+    .status-yellow { color: orange; font-weight: bold; }
+    .status-red { color: red; font-weight: bold; }
   </style>
 </head>
 <body>
   <div class="container my-4">
-    <h2 class="mb-4">📋 جميع الأساتذة</h2>
-
-    <div class="row mb-4">
-      <div class="col-md-6 mb-2">
-        <input type="text" id="searchName" class="form-control" placeholder="🔍 بحث باسم الأستاذ">
-      </div>
-      <div class="col-md-6 mb-2">
-        <select id="filterOffer" class="form-select">
-          <option value="">📦 كل العروض</option>
-          <option value="15">15 ساعة</option>
-          <option value="50">50 ساعة</option>
-          <option value="100">100 ساعة</option>
-        </select>
-      </div>
-    </div>
-
-    <div id="teacherList" class="row"></div>
-    <a href="index.html" class="btn btn-secondary mt-3">🔙 رجوع للصفحة الرئيسية</a>
+    <h1 class="mb-4">📚 قائمة كل الأساتذة</h1>
+    <div id="teachersList"></div>
   </div>
+
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
@@ -40,86 +28,56 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    async function loadTeachers() {
-      const snapshot = await db.collection("teachers").get();
-      const list = document.getElementById("teacherList");
-      list.innerHTML = "";
+    function getStatusColor(remaining, total) {
+      const remainingSessions = Math.floor(remaining / 1.5);
+      if (remainingSessions === 0) return "🔴 منتهي";
+      if (remainingSessions <= 3) return "🟡 على وشك الانتهاء";
+      return "🟢 نشط";
+    }
 
-      const searchName = document.getElementById("searchName").value.toLowerCase();
-      const filterOffer = document.getElementById("filterOffer").value;
-      const today = new Date();
+    function calculateDaysSince(dateStr) {
+      const start = new Date(dateStr);
+      const now = new Date();
+      const diff = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+      return diff;
+    }
 
-      snapshot.docs.forEach(doc => {
+    db.collection("teachers").get().then(snapshot => {
+      let html = "";
+      snapshot.forEach(doc => {
         const t = doc.data();
-        const id = doc.id;
-
-        if (searchName && !t.name.toLowerCase().includes(searchName)) return;
-        if (filterOffer && t.offer !== filterOffer) return;
-
-        const originalHours = parseInt(t.offer);
-        const completedSessions = ((originalHours - t.remainingHours) / 1.5).toFixed(0);
-        const remainingSessions = (t.remainingHours / 1.5).toFixed(0);
-        const startDate = new Date(t.startDate);
-        const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
-        const offerWeeks = t.offer === "100" ? 24 : t.offer === "50" ? 6 : 3;
-        const isExpired = t.remainingHours <= 0 || (daysSinceStart / 7) >= offerWeeks;
-
-        let statusBadge = "";
-        if (isExpired) {
-          statusBadge = `<div class="badge bg-danger mb-2">🔴 منتهي</div>`;
-        } else if (remainingSessions <= 3) {
-          statusBadge = `<div class="badge bg-warning text-dark mb-2">🟡 شبه منتهي</div>`;
-        } else {
-          statusBadge = `<div class="badge bg-success mb-2">🟢 نشط</div>`;
-        }
-        const card = document.createElement("div");
-        card.className = "col-md-6";
-        card.innerHTML = `
-          <div class="card-teacher">
-            ${statusBadge}
-            <strong>${t.name}</strong> - ${t.offer} ساعة<br>
-            📞 ${t.phone} | يبدأ: ${t.startDate}<br>
-            💰 ${t.amountPaid} / ${t.totalAmount}<br>
-            ⏱️ المتبقي: ${t.remainingHours} ساعة
-            <div class="mt-2 text-muted small">
-              📈 الجلسات المنجزة: ${completedSessions} جلسة<br>
-              ⏳ الجلسات المتبقية: ${remainingSessions} جلسة<br>
-              🗓️ منذ بدء الاشتراك: ${daysSinceStart} يومًا
-            </div>
-            <div class="mt-2 d-flex gap-2 flex-wrap">
-              <a href="details.html?teacher=${encodeURIComponent(t.name)}" class="btn btn-sm btn-outline-primary">📄 تفاصيل</a>
-              <button onclick="editTeacher('${id}')" class="btn btn-sm btn-warning">✏️ تعديل</button>
-              <button onclick="deleteTeacher('${id}')" class="btn btn-sm btn-danger">🗑️ حذف</button>
-              <button onclick="decreaseHours('${id}', ${t.remainingHours})" class="btn btn-sm btn-secondary">➖ 1.5 ساعة</button>
-              <a href="https://wa.me/${t.phone}?text=${encodeURIComponent('مرحبا استاذ ' + t.name + ' اهلا وسهلا بك في عائلة نون')}" target="_blank" class="btn btn-sm btn-success">💬 ترحيب واتساب</a>
-            </div>
+        const status = getStatusColor(t.remainingHours, parseInt(t.offer));
+        const done = Math.floor((parseInt(t.offer) - t.remainingHours) / 1.5);
+        const left = Math.floor(t.remainingHours / 1.5);
+        const daysSince = calculateDaysSince(t.startDate);
+        html += `
+          <div class="teacher-card">
+            <h5>${t.name} - ${t.offer} ساعة</h5>
+            <p>هاتف: ${t.phone} | بدأ: ${t.startDate}</p>
+            <p>المدفوع: ${t.amountPaid} / ${t.totalAmount}</p>
+            <p>💼 الحالة: ${status}</p>
+            <p>📊 الجلسات المنجزة: ${done} | المتبقية: ${left} | منذ البدء: ${daysSince} يوم</p>
+            <a href="details.html?id=${doc.id}" class="btn btn-primary btn-sm">📄 تفاصيل</a>
+            <a href="edit-teacher.html?id=${doc.id}" class="btn btn-warning btn-sm">✏️ تعديل</a>
+            <button onclick="deleteTeacher('${doc.id}')" class="btn btn-danger btn-sm">🗑️ حذف</button>
+            <a href="https://wa.me/${t.phone}?text=مرحبا استاذ ${encodeURIComponent(t.name)} اهلا وسهلا بك في عائلة نون" target="_blank" class="btn btn-success btn-sm">📩 ترحيب</a>
+            <button onclick="decreaseHour('${doc.id}', ${t.remainingHours})" class="btn btn-outline-danger btn-sm">➖ جلسة (1.5 ساعة)</button>
           </div>
         `;
-        list.appendChild(card);
       });
-    }
+      document.getElementById("teachersList").innerHTML = html;
+    });
 
-    function editTeacher(id) {
-      window.location.href = `edit-teacher.html?id=${id}`;
-    }
-
-    async function deleteTeacher(id) {
+    function deleteTeacher(id) {
       if (confirm("هل أنت متأكد من حذف الأستاذ؟")) {
-        await db.collection("teachers").doc(id).delete();
-        loadTeachers();
+        db.collection("teachers").doc(id).delete().then(() => location.reload());
       }
     }
 
-    async function decreaseHours(id, currentHours) {
-      const updated = Math.max(0, currentHours - 1.5);
-      await db.collection("teachers").doc(id).update({ remainingHours: updated });
-      loadTeachers();
+    function decreaseHour(id, hours) {
+      const newHours = Math.max(0, hours - 1.5);
+      db.collection("teachers").doc(id).update({ remainingHours: newHours }).then(() => location.reload());
     }
-
-    document.getElementById("searchName").addEventListener("input", loadTeachers);
-    document.getElementById("filterOffer").addEventListener("change", loadTeachers);
-
-    loadTeachers();
   </script>
 </body>
 </html>
