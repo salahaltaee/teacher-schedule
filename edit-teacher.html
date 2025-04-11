@@ -50,7 +50,6 @@
       <a href="all-teachers.html" class="btn btn-secondary">🔙 رجوع</a>
     </form>
   </div>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAHf3U8lU8aoGv4YYUZ57iPvRHirSwNkew",
@@ -73,7 +72,7 @@
     async function loadTeacher() {
       const doc = await db.collection("teachers").doc(teacherId).get();
       if (!doc.exists) {
-        alert("الأستاذ غير موجود!");
+        alert("❌ الأستاذ غير موجود!");
         window.location.href = "all-teachers.html";
         return;
       }
@@ -98,7 +97,7 @@
         totalAmount: parseFloat(totalAmountInput.value),
         remainingHours: parseFloat(remainingHoursInput.value)
       });
-      alert("تم حفظ التعديلات بنجاح!");
+      alert("✅ تم حفظ التعديلات بنجاح!");
       window.location.href = "all-teachers.html";
     });
 
