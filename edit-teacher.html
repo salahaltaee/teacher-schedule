@@ -8,44 +8,33 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
   <style>
     body { direction: rtl; }
+    .time-btn { margin: 2px; }
+    .active-time { background-color: #198754; color: white; }
   </style>
 </head>
 <body>
   <div class="container my-4">
     <h2 class="mb-4">✏️ تعديل بيانات الأستاذ</h2>
     <form id="editForm">
-      <div class="mb-3">
-        <label for="name" class="form-label">اسم الأستاذ</label>
-        <input type="text" class="form-control" id="name" required>
-      </div>
-      <div class="mb-3">
-        <label for="phone" class="form-label">رقم الهاتف</label>
-        <input type="text" class="form-control" id="phone" required>
-      </div>
-      <div class="mb-3">
-        <label for="offer" class="form-label">نوع العرض</label>
+      <div class="mb-3"><label class="form-label">اسم الأستاذ</label><input type="text" class="form-control" id="name" required></div>
+      <div class="mb-3"><label class="form-label">رقم الهاتف</label><input type="text" class="form-control" id="phone" required></div>
+      <div class="mb-3"><label class="form-label">نوع العرض</label>
         <select class="form-select" id="offer" required>
           <option value="15">15 ساعة</option>
           <option value="50">50 ساعة</option>
           <option value="100">100 ساعة</option>
         </select>
       </div>
+      <div class="mb-3"><label class="form-label">تاريخ البدء</label><input type="date" class="form-control" id="startDate" required></div>
+      <div class="mb-3"><label class="form-label">المبلغ المدفوع</label><input type="number" class="form-control" id="amountPaid" required></div>
+      <div class="mb-3"><label class="form-label">المبلغ الإجمالي</label><input type="number" class="form-control" id="totalAmount" required></div>
+      <div class="mb-3"><label class="form-label">الساعات المتبقية</label><input type="number" class="form-control" id="remainingHours" required></div>
+
       <div class="mb-3">
-        <label for="startDate" class="form-label">تاريخ البدء</label>
-        <input type="date" class="form-control" id="startDate" required>
+        <label class="form-label">🕐 الأوقات المتاحة</label>
+        <div id="availability-container"></div>
       </div>
-      <div class="mb-3">
-        <label for="amountPaid" class="form-label">المبلغ المدفوع</label>
-        <input type="number" class="form-control" id="amountPaid" required>
-      </div>
-      <div class="mb-3">
-        <label for="totalAmount" class="form-label">المبلغ الإجمالي</label>
-        <input type="number" class="form-control" id="totalAmount" required>
-      </div>
-      <div class="mb-3">
-        <label for="remainingHours" class="form-label">الساعات المتبقية</label>
-        <input type="number" class="form-control" id="remainingHours" required>
-      </div>
+
       <button type="submit" class="btn btn-primary">💾 حفظ التعديلات</button>
       <a href="all-teachers.html" class="btn btn-secondary">🔙 رجوع</a>
     </form>
@@ -61,13 +50,38 @@
     const urlParams = new URLSearchParams(window.location.search);
     const teacherId = urlParams.get("id");
 
-    const nameInput = document.getElementById("name");
-    const phoneInput = document.getElementById("phone");
-    const offerInput = document.getElementById("offer");
-    const startDateInput = document.getElementById("startDate");
-    const amountPaidInput = document.getElementById("amountPaid");
-    const totalAmountInput = document.getElementById("totalAmount");
-    const remainingHoursInput = document.getElementById("remainingHours");
+    const days = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+    const sessionTimes = [
+      "08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00",
+      "14:00 - 16:00", "16:00 - 18:00", "18:00 - 20:00", "20:00 - 22:00"
+    ];
+    let availability = {};
+
+    const container = document.getElementById("availability-container");
+
+    function renderAvailability() {
+      container.innerHTML = "";
+      days.forEach(day => {
+        const dayRow = document.createElement("div");
+        dayRow.innerHTML = `<strong>${day}</strong><br>`;
+        sessionTimes.forEach(time => {
+          const btn = document.createElement("button");
+          btn.className = "btn btn-sm time-btn " + (availability[day]?.includes(time) ? "active-time" : "btn-outline-secondary");
+          btn.textContent = time;
+          btn.onclick = () => {
+            availability[day] = availability[day] || [];
+            if (availability[day].includes(time)) {
+              availability[day] = availability[day].filter(t => t !== time);
+            } else {
+              availability[day].push(time);
+            }
+            renderAvailability();
+          };
+          dayRow.appendChild(btn);
+        });
+        container.appendChild(dayRow);
+      });
+    }
 
     async function loadTeacher() {
       const doc = await db.collection("teachers").doc(teacherId).get();
@@ -77,25 +91,28 @@
         return;
       }
       const t = doc.data();
-      nameInput.value = t.name;
-      phoneInput.value = t.phone;
-      offerInput.value = t.offer;
-      startDateInput.value = t.startDate;
-      amountPaidInput.value = t.amountPaid;
-      totalAmountInput.value = t.totalAmount;
-      remainingHoursInput.value = t.remainingHours;
+      document.getElementById("name").value = t.name;
+      document.getElementById("phone").value = t.phone;
+      document.getElementById("offer").value = t.offer;
+      document.getElementById("startDate").value = t.startDate;
+      document.getElementById("amountPaid").value = t.amountPaid;
+      document.getElementById("totalAmount").value = t.totalAmount;
+      document.getElementById("remainingHours").value = t.remainingHours;
+      availability = t.availability || {};
+      renderAvailability();
     }
 
     document.getElementById("editForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       await db.collection("teachers").doc(teacherId).update({
-        name: nameInput.value,
-        phone: phoneInput.value,
-        offer: offerInput.value,
-        startDate: startDateInput.value,
-        amountPaid: parseFloat(amountPaidInput.value),
-        totalAmount: parseFloat(totalAmountInput.value),
-        remainingHours: parseFloat(remainingHoursInput.value)
+        name: document.getElementById("name").value,
+        phone: document.getElementById("phone").value,
+        offer: document.getElementById("offer").value,
+        startDate: document.getElementById("startDate").value,
+        amountPaid: parseFloat(document.getElementById("amountPaid").value),
+        totalAmount: parseFloat(document.getElementById("totalAmount").value),
+        remainingHours: parseFloat(document.getElementById("remainingHours").value),
+        availability: availability
       });
       alert("✅ تم حفظ التعديلات بنجاح!");
       window.location.href = "all-teachers.html";
